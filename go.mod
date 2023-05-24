@@ -2,6 +2,12 @@ module github.com/henderiw-nephio/network
 
 go 1.20
 
+replace k8s.io/api => k8s.io/api v0.26.1
+
+replace k8s.io/apimachinery => k8s.io/apimachinery v0.26.1
+
+replace k8s.io/client-go => k8s.io/client-go v0.26.1
+
 require (
 	github.com/go-logr/logr v1.2.4
 	github.com/hansthienpondt/nipam v0.0.5
@@ -44,6 +50,7 @@ require (
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go4.org/netipx v0.0.0-20230303233057-f1b76eb4bb35 // indirect
