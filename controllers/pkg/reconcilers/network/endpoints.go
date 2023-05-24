@@ -16,7 +16,11 @@ limitations under the License.
 
 package network
 
-import invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
+import (
+	"sort"
+
+	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
+)
 
 type endpoints struct {
 	*invv1alpha1.EndpointList
@@ -34,6 +38,7 @@ func (self *endpoints) GetClusters() []string {
 			lclusterNames[clusterName] = struct{}{}
 		}
 	}
+	sort.Strings(clusterNames)
 	return clusterNames
 }
 
@@ -54,10 +59,12 @@ func (self *endpoints) GetClustersPerNode() map[string][]string {
 
 			if _, ok := lclusterNames[e.Spec.NodeName][clusterName]; !ok {
 				clusterNamesPerNode[e.Spec.NodeName] = append(clusterNamesPerNode[e.Spec.NodeName], clusterName)
+				sort.Strings(clusterNamesPerNode[e.Spec.NodeName])
 			}
 			lclusterNames[e.Spec.NodeName][clusterName] = struct{}{}
 		}
 	}
+
 	return clusterNamesPerNode
 }
 

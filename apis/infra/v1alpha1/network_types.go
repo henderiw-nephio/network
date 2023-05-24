@@ -48,7 +48,7 @@ type Interface struct {
 	// this parameter is mandatory
 	Name *string `json:"name,omitempty" yaml:"name,omitempty"`
 	// Selector defines the selector criterias for the interface selection
-	Selector metav1.LabelSelector `json:"selector" yaml:"selector"`
+	Selector metav1.LabelSelector `json:"selector,omitempty" yaml:"selector,omitempty"`
 }
 
 // NetworkStatus defines the observed state of Network

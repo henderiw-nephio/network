@@ -224,7 +224,7 @@ func (r *reconciler) populateIPAM(ctx context.Context, cr *infrav1alpha1.Network
 					rtable.Add(route)
 
 					prefix := ipamv1alpha1.BuildIPPrefix(metav1.ObjectMeta{
-						Name:            fmt.Sprintf("%s-%s", clusterName, *bd.Name),
+						Name:            fmt.Sprintf("%s-%s-%s", clusterName, *bd.Name, p.String()),
 						Namespace:       cr.Namespace,
 						OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
 					}, ipamv1alpha1.IPPrefixSpec{

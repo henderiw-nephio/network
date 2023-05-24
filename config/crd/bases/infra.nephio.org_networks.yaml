@@ -97,8 +97,6 @@ spec:
                                 type: object
                             type: object
                             x-kubernetes-map-type: atomic
-                        required:
-                        - selector
                         type: object
                       type: array
                     name:
@@ -165,8 +163,6 @@ spec:
                                 type: object
                             type: object
                             x-kubernetes-map-type: atomic
-                        required:
-                        - selector
                         type: object
                       type: array
                     interfaces:
@@ -224,8 +220,6 @@ spec:
                                 type: object
                             type: object
                             x-kubernetes-map-type: atomic
-                        required:
-                        - selector
                         type: object
                       type: array
                     name:

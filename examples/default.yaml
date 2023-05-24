@@ -3,14 +3,10 @@ kind: Network
 metadata:
   name: default
 spec:
+  topology: nephio
   routingTables:
   - name: default
-    interfaces:
-    - name: internalInterfaces
-      selector:
-        internalInterfaceKey: yyy
-    - name: clusters
-      selector:
-        clusterKey: xxx
+    prefixes:
+      - prefix: 10.0.0.0/8
   
     
