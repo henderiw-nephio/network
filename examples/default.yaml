@@ -1,0 +1,16 @@
+apiVersion: infra.nephio.org/v1alpha1
+kind: Network
+metadata:
+  name: default
+spec:
+  routingTables:
+  - name: default
+    interfaces:
+    - name: internalInterfaces
+      selector:
+        internalInterfaceKey: yyy
+    - name: clusters
+      selector:
+        clusterKey: xxx
+  
+    

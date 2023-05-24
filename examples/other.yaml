@@ -1,0 +1,25 @@
+apiVersion: infra.nephio.org/v1alpha1
+kind: Network
+metadata:
+  name: internet
+spec:
+  vars:
+    cluster: unique clusterKey
+    clusterInterface: unique ep(s) in $cluster
+  routingTables:
+  - name: internet
+    bridgeDomains:
+    - name: internet + $cluster # irb + cluster prefix is created here
+    prefixes:
+    - prefix: 172.0.0.0/16
+    - prefix: 10.0.0.0/8
+      labels:
+        nephio.org/pool: "true"
+    protocols:
+  bridgeDomains: # per selector Key
+  - name: internet + $cluster
+    interfaces:
+    - name: internet + $cluster + $clusterInterface
+      selector:
+        clusterKey: xxx
+    
