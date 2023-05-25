@@ -192,12 +192,13 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			r.l.Error(err, "cannot construct json device info")
 			return err
 		}
-		b, err := json.MarshalIndent(j, "", "  ")
-		fmt.Println(b)
+		b, _ := json.MarshalIndent(j, "", "  ")
+		fmt.Println(string(b))
 	}
 	for resourceName, r := range n.resources {
 		fmt.Println(resourceName)
-		fmt.Println(r)
+		b, _ := json.MarshalIndent(r, "", "  ")
+		fmt.Println(string(b))
 	}
 	return nil
 }
