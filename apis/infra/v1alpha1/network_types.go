@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
+	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,18 +38,26 @@ type BridgeDomain struct {
 }
 
 type RoutingTable struct {
-	Name          string                `json:"name" yaml:"name"`
-	Interfaces    []Interface           `json:"interfaces,omitempty" yaml:"interfaces,omitempty"`
-	BridgeDomains []Interface           `json:"bridgeDomains,omitempty" yaml:"bridgeDomains,omitempty"`
-	Prefixes      []ipamv1alpha1.Prefix `json:"prefixes" yaml:"prefixes"`
+	Name       string                `json:"name" yaml:"name"`
+	Interfaces []Interface           `json:"interfaces,omitempty" yaml:"interfaces,omitempty"`
+	Prefixes   []ipamv1alpha1.Prefix `json:"prefixes" yaml:"prefixes"`
 }
 
 type Interface struct {
-	// Name defines the name of the interface or name of the bridge domain. When using a bridgedoamin
-	// this parameter is mandatory
-	Name *string `json:"name,omitempty" yaml:"name,omitempty"`
+	// +kubebuilder:validation:Enum=`interface`;`bridgedomain`
+	// +kubebuilder:default=interface
+	Kind InterfaceKind `json:"kind" yaml:"kind"`
+	// BridgeDomainName defines the name of the bridgeDomain
+	BridgeDomainName *string `json:"bridgeDomainName,omitempty" yaml:"bridgeDomainName,omitempty"`
+	// InterfaceName defines the name of the interface
+	InterfaceName *string `json:"interfaceName,omitempty" yaml:"interfaceName,omitempty"`
+	// NodeName defines the name of the node the interface belongs to
+	NodeName      *string `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
 	// Selector defines the selector criterias for the interface selection
-	Selector metav1.LabelSelector `json:"selector,omitempty" yaml:"selector,omitempty"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" yaml:"selector,omitempty"`
+	// AttachmentType defines if the interface is attached using a vlan or not
+	// +kubebuilder:validation:Enum=none;vlan
+	AttachmentType reqv1alpha1.AttachmentType `json:"attachmentType,omitempty" yaml:"attachmentType,omitempty"`
 }
 
 // NetworkStatus defines the observed state of Network

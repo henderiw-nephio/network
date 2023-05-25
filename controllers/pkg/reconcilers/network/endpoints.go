@@ -18,70 +18,103 @@ package network
 
 import (
 	"sort"
+	"strings"
 
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type endpoints struct {
 	*invv1alpha1.EndpointList
 }
 
-func (self *endpoints) GetClusters() []string {
-	clusterNames := []string{}
-	lclusterNames := map[string]struct{}{}
-	for _, e := range self.Items {
-		clusterName, ok := e.GetLabels()[invv1alpha1.NephioClusterNameKey]
-		if ok {
-			if _, ok := lclusterNames[clusterName]; !ok {
-				clusterNames = append(clusterNames, clusterName)
-			}
-			lclusterNames[clusterName] = struct{}{}
+func getKeys(s *metav1.LabelSelector) []string {
+	keys := []string{}
+	for k := range s.MatchLabels {
+		keys = append(keys, k)
+	}
+	for _, req := range s.MatchExpressions {
+		if req.Operator == metav1.LabelSelectorOpExists || req.Operator == metav1.LabelSelectorOpIn {
+			keys = append(keys, req.Key)
 		}
 	}
-	sort.Strings(clusterNames)
-	return clusterNames
+	sort.Strings(keys)
+	return keys
 }
 
-func (self *endpoints) GetClustersPerNode() map[string][]string {
-	clusterNamesPerNode := map[string][]string{}
-	lclusterNames := map[string]map[string]struct{}{}
-	for _, e := range self.Items {
-		clusterName, ok := e.GetLabels()[invv1alpha1.NephioClusterNameKey]
-		if ok {
-			// initialize lclusterNames struct with the nodeName if it does not exist
-			if _, ok := lclusterNames[e.Spec.NodeName]; !ok {
-				lclusterNames[e.Spec.NodeName] = map[string]struct{}{}
-			}
-			// initialize clusterNamesPerNode struct with the nodeName if it does not exist
-			if _, ok := clusterNamesPerNode[e.Spec.NodeName]; !ok {
-				clusterNamesPerNode[e.Spec.NodeName] = []string{}
-			}
-
-			if _, ok := lclusterNames[e.Spec.NodeName][clusterName]; !ok {
-				clusterNamesPerNode[e.Spec.NodeName] = append(clusterNamesPerNode[e.Spec.NodeName], clusterName)
-				sort.Strings(clusterNamesPerNode[e.Spec.NodeName])
-			}
-			lclusterNames[e.Spec.NodeName][clusterName] = struct{}{}
-		}
-	}
-
-	return clusterNamesPerNode
+func (self *endpoints) iterator() *iterator[invv1alpha1.Endpoint] {
+	return &iterator[invv1alpha1.Endpoint]{curIdx: -1, items: self.Items}
 }
 
-func (self *endpoints) GetEndpointsPerClusterPerNode() map[string]map[string][]invv1alpha1.Endpoint {
-	epPerClusterPerNode := map[string]map[string][]invv1alpha1.Endpoint{}
-	for _, e := range self.Items {
-		clusterName, ok := e.GetLabels()[invv1alpha1.NephioClusterNameKey]
-		if ok {
-			// initialize epPerClusterPerNode struct with the nodeName if it does not exist
-			if _, ok := epPerClusterPerNode[e.Spec.NodeName]; !ok {
-				epPerClusterPerNode[e.Spec.NodeName] = map[string][]invv1alpha1.Endpoint{}
+// GetUniqueKeyValues returns unique values based on the selector keys
+// e.g. used to return the unique clusters endpoints if the selector is about clusters
+func (self *endpoints) GetUniqueKeyValues(selector labels.Selector, keys []string) []string {
+	values := []string{}
+	lvalues := map[string]struct{}{}
+
+	iter := self.iterator()
+	if iter.HasNext() {
+		if selector.Matches(labels.Set(iter.Value().Labels)) {
+			selectorName := getKeyValueName(labels.Set(iter.Value().Labels), keys)
+			if _, ok := lvalues[selectorName]; !ok {
+				values = append(values, selectorName)
 			}
-			if _, ok := epPerClusterPerNode[e.Spec.NodeName][clusterName]; !ok {
-				epPerClusterPerNode[e.Spec.NodeName][clusterName] = []invv1alpha1.Endpoint{}
-			}
-			epPerClusterPerNode[e.Spec.NodeName][clusterName] = append(epPerClusterPerNode[e.Spec.NodeName][clusterName], e)
+			lvalues[selectorName] = struct{}{}
 		}
 	}
-	return epPerClusterPerNode
+	return values
+}
+
+// getKeyValueName provides a unique name based on all keys (keys are sorted)
+func getKeyValueName(labels map[string]string, keys []string) string {
+	var sb strings.Builder
+	for i, key := range keys {
+		if v, ok := labels[key]; ok {
+			if i == 0 {
+				sb.WriteString(v)
+			} else {
+				sb.WriteString("-" + v)
+			}
+		}
+	}
+	return sb.String()
+}
+
+func (self *endpoints) GetNodes(selector labels.Selector) []string {
+	values := []string{}
+	lvalues := map[string]struct{}{}
+
+	iter := self.iterator()
+	if iter.HasNext() {
+		if selector.Matches(labels.Set(iter.Value().Labels)) {
+			if _, ok := lvalues[iter.Value().Spec.NodeName]; !ok {
+				values = append(values, iter.Value().Spec.NodeName)
+			}
+			lvalues[iter.Value().Spec.NodeName] = struct{}{}
+		}
+	}
+	return values
+}
+
+func (self *endpoints) GetEndpointsPerSelector(s *metav1.LabelSelector) (map[string][]invv1alpha1.Endpoint, error) {
+	selector, err := metav1.LabelSelectorAsSelector(s)
+	if err != nil {
+		return nil, err
+	}
+	keys := getKeys(s)
+	epPerSelector := map[string][]invv1alpha1.Endpoint{}
+
+	iter := self.iterator()
+	if iter.HasNext() {
+		if selector.Matches(labels.Set(iter.Value().Labels)) {
+			selectorName := getKeyValueName(labels.Set(iter.Value().Labels), keys)
+			// initialize struct with the selectorName if it does not exist
+			if _, ok := epPerSelector[selectorName]; !ok {
+				epPerSelector[selectorName] = []invv1alpha1.Endpoint{}
+			}
+			epPerSelector[selectorName] = append(epPerSelector[selectorName], iter.Value())
+		}
+	}
+	return epPerSelector, nil
 }

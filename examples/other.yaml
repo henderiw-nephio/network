@@ -4,18 +4,23 @@ metadata:
   name: internet
 spec:
   topology: nephio
-  #vars:
-  #  cluster: unique clusterKey
-  #  clusterInterface: unique ep(s) in $cluster
   routingTables:
   - name: internet
-    bridgeDomains:
-    - name: internet # irb + cluster prefix is created here
     prefixes:
     - prefix: 172.0.0.0/16
     - prefix: 10.0.0.0/8
       labels:
         nephio.org/nephio.org/prefix-kind: pool
+    interfaces:
+    - kind: bridgedomain
+      name: internet # irb + cluster prefix is created here
   bridgeDomains: # per selector Key
-  - name: internet 
+  - name: internet
+    interfaces:
+    - name: all clusters
+      selector:
+        matchExpressions:
+        - {key: nephio.org/cluster-name, operator: exists}
+      attachmentType: vlan
+      
     

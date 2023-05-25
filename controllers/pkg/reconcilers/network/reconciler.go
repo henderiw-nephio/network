@@ -19,25 +19,22 @@ package network
 import (
 	"context"
 	"fmt"
-	"net/netip"
-	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/hansthienpondt/nipam/pkg/table"
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
-	"github.com/nokia/k8s-ipam/pkg/iputil"
+	"github.com/nokia/k8s-ipam/pkg/hash"
+	"github.com/openconfig/ygot/ygot"
 
 	//"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
+
 	"github.com/pkg/errors"
+	"github.com/srl-labs/ygotsrl/v22"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -86,6 +83,7 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[sche
 
 	r.APIPatchingApplicator = resource.NewAPIPatchingApplicator(mgr.GetClient())
 	r.finalizer = resource.NewAPIFinalizer(mgr.GetClient(), finalizer)
+	r.devices = map[string]*ygotsrl.Device{}
 
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("NetworkController").
@@ -98,7 +96,8 @@ type reconciler struct {
 	finalizer *resource.APIFinalizer
 	//clientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
 
-	l logr.Logger
+	l       logr.Logger
+	devices map[string]*ygotsrl.Device
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -116,6 +115,8 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	// TODO validation
+	// validate itfce/node or selector
+	// validate in rt + bd -> the itfce/node or selector is coming from the bd
 
 	if resource.WasDeleted(cr) {
 		if err := r.finalizer.RemoveFinalizer(ctx, cr); err != nil {
@@ -142,7 +143,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	if err := r.populateIPAM(ctx, cr, eps); err != nil {
+	if err := r.getNewResources(ctx, cr, eps); err != nil {
 		r.l.Error(err, "cannot add ipam resources")
 		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
@@ -167,11 +168,46 @@ func (r *reconciler) getProviderEndpoints(ctx context.Context, topology string) 
 	return &endpoints{eps}, nil
 }
 
-func (r *reconciler) populateIPAM(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints) error {
+func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints) error {
+	n := &network{
+		Network:   cr,
+		devices:   map[string]*ygotsrl.Device{},
+		resources: map[corev1.ObjectReference]client.Object{},
+		eps:       eps,
+		hash:      hash.New(10000),
+	}
+	if err := n.PopulateBridgeDomains(ctx); err != nil {
+		r.l.Error(err, "cannot populate bridgedomains")
+	}
+	if err := n.PopulateRoutingTables(ctx); err != nil {
+		r.l.Error(err, "cannot populate routing Tables")
+	}
+	for nodeName, device := range n.devices {
+		r.l.Info("node config", "nodeName", nodeName)
+		json, err := ygot.ConstructInternalJSON(device)
+		if err != nil {
+			r.l.Error(err, "cannot construct json device info")
+		}
+		fmt.Println(json)
+	}
+	for resourceName, r := range n.resources {
+		fmt.Println(resourceName)
+		fmt.Println(r)
+	}
+	return nil
+}
+
+/*
+func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints) error {
+	for _, nodeName := range eps.GetNodes() {
+		r.devices[nodeName] = new(ygotsrl.Device)
+	}
+
 	for _, rt := range cr.Spec.RoutingTables {
 		// create ipam network instance
+		niName := fmt.Sprintf("rt-%s", rt.Name)
 		ni := ipamv1alpha1.BuildNetworkInstance(metav1.ObjectMeta{
-			Name:            fmt.Sprintf("rt-%s", rt.Name),
+			Name:            niName,
 			Namespace:       cr.Namespace,
 			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
 		}, ipamv1alpha1.NetworkInstanceSpec{
@@ -184,6 +220,16 @@ func (r *reconciler) populateIPAM(ctx context.Context, cr *infrav1alpha1.Network
 			return err
 		}
 		r.l.Info("ipam network instance created", "name", fmt.Sprintf("rt-%s", rt.Name))
+
+		for _, nodeName := range eps.GetNodes() {
+			d := r.devices[nodeName]
+			ni := d.GetOrCreateNetworkInstance(niName)
+			ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
+			ni.IpForwarding = &ygotsrl.SrlNokiaNetworkInstance_NetworkInstance_IpForwarding{
+				ReceiveIpv4Check: ygot.Bool(true),
+				ReceiveIpv6Check: ygot.Bool(true),
+			}
+		}
 
 		rtable := table.NewRIB()
 		for _, prefix := range rt.Prefixes {
@@ -210,6 +256,7 @@ func (r *reconciler) populateIPAM(ctx context.Context, cr *infrav1alpha1.Network
 
 			for _, bd := range rt.BridgeDomains {
 				for _, clusterName := range eps.GetClusters() {
+
 					p := rtable.GetAvailablePrefixByBitLen(mpi.GetIPPrefix(), uint8(prefixLength))
 					// add clusterName to the labels
 					labels := getClusterLabels(labels, clusterName)
@@ -242,9 +289,16 @@ func (r *reconciler) populateIPAM(ctx context.Context, cr *infrav1alpha1.Network
 						r.l.Error(err, "cannot create ipam prefix")
 						return err
 					}
+
+					for _, nodeName := range eps.GetNodes() {
+						d := r.devices[nodeName]
+						ni := d.GetOrCreateNetworkInstance(niName)
+						ni.GetOrCreateInterface()
+					}
 				}
 			}
 		}
 	}
 	return nil
 }
+*/

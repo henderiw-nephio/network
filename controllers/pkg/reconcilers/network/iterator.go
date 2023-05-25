@@ -14,22 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package network
 
-// GetCondition returns the condition based on the condition kind
-func (r *Network) GetCondition(t ConditionType) Condition {
-	return r.Status.GetCondition(t)
+type iterator[T any] struct {
+	curIdx int
+	items  []T
 }
 
-// SetConditions sets the conditions on the resource. it allows for 0, 1 or more conditions
-// to be set at once
-func (r *Network) SetConditions(c ...Condition) {
-	r.Status.SetConditions(c...)
+func (self *iterator[T]) HasNext() bool {
+	self.curIdx++
+	return self.curIdx < len(self.items)
 }
 
-type InterfaceKind string
-
-const (
-	InterfaceKindInterface    InterfaceKind = "interface"
-	InterfaceKindBridgeDomain InterfaceKind = "bridgedomain"
-)
+func (self *iterator[T]) Value() T {
+	return self.items[self.curIdx]
+}
