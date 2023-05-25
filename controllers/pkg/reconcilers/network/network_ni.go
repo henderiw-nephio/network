@@ -34,17 +34,6 @@ func (self *network) PopulateBridgeDomain(ctx context.Context, nodeName string, 
 	if _, ok := self.devices[nodeName]; !ok {
 		self.devices[nodeName] = new(ygotsrl.Device)
 	}
-	// create VLAN DataBase
-	o := vlanv1alpha1.BuildVLANDatabase(
-		metav1.ObjectMeta{
-			Name:            selectorName, // the vlan db is always the selectorName since the bd is physical and not virtual
-			Namespace:       self.Namespace,
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: self.APIVersion, Kind: self.Kind, Name: self.Name, UID: self.UID, Controller: pointer.Bool(true)}},
-		},
-		vlanv1alpha1.VLANDatabaseSpec{},
-		vlanv1alpha1.VLANDatabaseStatus{},
-	)
-	self.resources[corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace}] = o
 
 	// create ni Intstance and interfaces
 	//bdIndex := self.hash.Insert(bdName, "dummy", map[string]string{})

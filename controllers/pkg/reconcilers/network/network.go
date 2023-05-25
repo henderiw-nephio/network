@@ -21,10 +21,12 @@ import (
 	"fmt"
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	"github.com/nephio-project/nephio/controllers/pkg/resource"
 
 	//ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
 
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
+	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/srl-labs/ygotsrl/v22"
@@ -36,33 +38,49 @@ import (
 
 type network struct {
 	*infrav1alpha1.Network
+	resource.APIPatchingApplicator
+	apply     bool
 	devices   map[string]*ygotsrl.Device
 	resources map[corev1.ObjectReference]client.Object
 	eps       *endpoints
 	hash      hash.HashTable
 }
 
-func (self *network) PopulateBridgeDomains(ctx context.Context) error {
-	for _, bd := range self.Spec.BridgeDomains {
+func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable) client.Object {
+	// create VLAN DataBase
+	o := ipamv1alpha1.BuildNetworkInstance(metav1.ObjectMeta{
+		Name:            fmt.Sprintf("%s-rt", rt.Name),
+		Namespace:       r.Namespace,
+		OwnerReferences: []metav1.OwnerReference{{APIVersion: r.APIVersion, Kind: r.Kind, Name: r.Name, UID: r.UID, Controller: pointer.Bool(true)}},
+	}, ipamv1alpha1.NetworkInstanceSpec{
+		Prefixes: rt.Prefixes,
+	}, ipamv1alpha1.NetworkInstanceStatus{})
+	r.resources[corev1.ObjectReference{APIVersion: o.GetResourceVersion(), Kind: o.GetObjectKind().GroupVersionKind().Kind, Name: o.GetName(), Namespace: o.GetNamespace()}] = o
+	return o
+}
+
+func (r *network) populateVlanDatabase(selectorName string) client.Object {
+	// create VLAN DataBase
+	o := vlanv1alpha1.BuildVLANDatabase(
+		metav1.ObjectMeta{
+			Name:            selectorName, // the vlan db is always the selectorName since the bd is physical and not virtual
+			Namespace:       r.Namespace,
+			OwnerReferences: []metav1.OwnerReference{{APIVersion: r.APIVersion, Kind: r.Kind, Name: r.Name, UID: r.UID, Controller: pointer.Bool(true)}},
+		},
+		vlanv1alpha1.VLANDatabaseSpec{},
+		vlanv1alpha1.VLANDatabaseStatus{},
+	)
+	r.resources[corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace}] = o
+	return o
+}
+
+func (r *network) PopulateBridgeDomains(ctx context.Context) error {
+	for _, bd := range r.Spec.BridgeDomains {
 		for _, itfce := range bd.Interfaces {
-			selector := &metav1.LabelSelector{}
-			if itfce.Selector != nil {
-				selector = itfce.Selector
-			} else {
-				// we assume the validation happend here that interfaceName and NodeName are not nil
-				selector = &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						invv1alpha1.NephioInterfaceNameKey: *itfce.InterfaceName,
-						invv1alpha1.NephioNodeNameKey:      *itfce.NodeName,
-					},
-				}
-			}
-			fmt.Println("selector", selector)
-			selectedEndpoints, err := self.eps.GetEndpointsPerSelector(selector)
+			selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
 			if err != nil {
 				return err
 			}
-			fmt.Println("selectedEndpoints", selectedEndpoints)
 			for selectorName, eps := range selectedEndpoints {
 				for _, ep := range eps {
 					// selectorName is a global unique identity
@@ -75,13 +93,22 @@ func (self *network) PopulateBridgeDomains(ctx context.Context) error {
 						bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
 					}
 
-					vlanId, err := self.PopulateBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
+					o := r.populateVlanDatabase(selectorName)
+					if r.apply {
+						if err := r.Apply(ctx, o); err != nil {
+							return err
+						}
+						// we can return here since we do another stage
+						continue
+					}
+
+					vlanId, err := r.PopulateBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
 					if err != nil {
 						return err
 					}
 					// create interface/subinterface
 					// create networkInstance interface
-					self.PopulateBridgeInterface(ctx, bdName, vlanId, ep)
+					r.PopulateBridgeInterface(ctx, bdName, vlanId, ep)
 				}
 			}
 		}
@@ -89,49 +116,50 @@ func (self *network) PopulateBridgeDomains(ctx context.Context) error {
 	return nil
 }
 
-func (self *network) PopulateRoutingTables(ctx context.Context) error {
-	for _, rt := range self.Spec.RoutingTables {
-		o := ipamv1alpha1.BuildNetworkInstance(metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-rt", rt.Name),
-			Namespace:       self.Namespace,
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: self.APIVersion, Kind: self.Kind, Name: self.Name, UID: self.UID, Controller: pointer.Bool(true)}},
-		}, ipamv1alpha1.NetworkInstanceSpec{
-			Prefixes: rt.Prefixes,
-		}, ipamv1alpha1.NetworkInstanceStatus{})
-		self.resources[corev1.ObjectReference{APIVersion: o.GetResourceVersion(), Kind: o.GetObjectKind().GroupVersionKind().Kind, Name: o.GetName(), Namespace: o.GetNamespace()}] = o
+func getSelector(itfce infrav1alpha1.Interface) *metav1.LabelSelector {
+	selector := &metav1.LabelSelector{}
+	if itfce.Selector != nil {
+		selector = itfce.Selector
+	} else {
+		// we assume the validation happend here that interfaceName and NodeName are not nil
+		selector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				invv1alpha1.NephioInterfaceNameKey: *itfce.InterfaceName,
+				invv1alpha1.NephioNodeNameKey:      *itfce.NodeName,
+			},
+		}
+	}
+	return selector
+}
+
+func (r *network) PopulateRoutingTables(ctx context.Context) error {
+	for _, rt := range r.Spec.RoutingTables {
+		o := r.populateIPAMNetworkInstance(rt)
+		if r.apply {
+			if err := r.Apply(ctx, o); err != nil {
+				return err
+			}
+			continue
+		}
 
 		for _, itfce := range rt.Interfaces {
 			if itfce.Kind == infrav1alpha1.InterfaceKindBridgeDomain {
 				// create IRB + we need to lookup the selectors in the bridge domain
-				for _, bd := range self.Spec.BridgeDomains {
+				for _, bd := range r.Spec.BridgeDomains {
 					if itfce.BridgeDomainName != nil && bd.Name == *itfce.BridgeDomainName {
 						for _, itfce := range bd.Interfaces {
-							selector := &metav1.LabelSelector{}
-							if itfce.Selector != nil {
-								selector = itfce.Selector
-							} else {
-								// we assume the validation happend here that interfaceName and NodeName are not nil
-								selector = &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										invv1alpha1.NephioInterfaceNameKey: *itfce.InterfaceName,
-										invv1alpha1.NephioNodeNameKey:      *itfce.NodeName,
-									},
-								}
-							}
-							selectedEndpoints, err := self.eps.GetEndpointsPerSelector(selector)
+							selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
 							if err != nil {
 								return err
 							}
-
 							for selectorName, eps := range selectedEndpoints {
 								for _, ep := range eps {
 									bdName := fmt.Sprintf("%s-bd", bd.Name)
 									if itfce.Selector != nil {
 										bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
 									}
-
-									self.PopulateIRBInterface(ctx, false, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
-									self.PopulateIRBInterface(ctx, true, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
+									r.PopulateIRBInterface(ctx, false, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
+									r.PopulateIRBInterface(ctx, true, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
 								}
 							}
 						}
@@ -140,18 +168,7 @@ func (self *network) PopulateRoutingTables(ctx context.Context) error {
 				return nil
 			}
 			// non irb interfaces
-			selector := &metav1.LabelSelector{}
-			if itfce.Selector != nil {
-				selector = itfce.Selector
-			} else {
-				selector = &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						invv1alpha1.NephioInterfaceNameKey: *itfce.InterfaceName,
-						invv1alpha1.NephioNodeNameKey:      *itfce.NodeName,
-					},
-				}
-			}
-			selectedEndpoints, err := self.eps.GetEndpointsPerSelector(selector)
+			selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
 			if err != nil {
 				return err
 			}
@@ -161,14 +178,13 @@ func (self *network) PopulateRoutingTables(ctx context.Context) error {
 					// create BD Index (hash)
 					// allocate VLAN ID
 					rtName := fmt.Sprintf("%s-rt", rt.Name)
-					vlanId, err := self.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
+					vlanId, err := r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
 					if err != nil {
 						return err
 					}
-
 					// create interface/subinterface
 					// create networkInstance interface
-					self.PopulateRoutedInterface(ctx, rtName, vlanId, ep)
+					r.PopulateRoutedInterface(ctx, rtName, vlanId, ep)
 				}
 			}
 		}
