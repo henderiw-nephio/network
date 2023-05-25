@@ -103,40 +103,42 @@ func (self *network) PopulateRoutingTables(ctx context.Context) error {
 			if itfce.Kind == infrav1alpha1.InterfaceKindBridgeDomain {
 				// create IRB + we need to lookup the selectors in the bridge domain
 				for _, bd := range self.Spec.BridgeDomains {
-					if bd.Name == *itfce.BridgeDomainName {
-						selector := &metav1.LabelSelector{}
-						if itfce.Selector != nil {
-							selector = itfce.Selector
-						} else {
-							// we assume the validation happend here that interfaceName and NodeName are not nil
-							selector = &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									invv1alpha1.NephioInterfaceNameKey: *itfce.InterfaceName,
-									invv1alpha1.NephioNodeNameKey:      *itfce.NodeName,
-								},
-							}
-						}
-						selectedEndpoints, err := self.eps.GetEndpointsPerSelector(selector)
-						if err != nil {
-							return err
-						}
-
-						for selectorName, eps := range selectedEndpoints {
-							for _, ep := range eps {
-								bdName := fmt.Sprintf("%s-bd", bd.Name)
-								if itfce.Selector != nil {
-									bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
+					if itfce.BridgeDomainName != nil && bd.Name == *itfce.BridgeDomainName {
+						for _, itfce := range bd.Interfaces {
+							selector := &metav1.LabelSelector{}
+							if itfce.Selector != nil {
+								selector = itfce.Selector
+							} else {
+								// we assume the validation happend here that interfaceName and NodeName are not nil
+								selector = &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										invv1alpha1.NephioInterfaceNameKey: *itfce.InterfaceName,
+										invv1alpha1.NephioNodeNameKey:      *itfce.NodeName,
+									},
 								}
+							}
+							selectedEndpoints, err := self.eps.GetEndpointsPerSelector(selector)
+							if err != nil {
+								return err
+							}
 
-								self.PopulateIRBInterface(ctx, false, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
-								self.PopulateIRBInterface(ctx, true, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
+							for selectorName, eps := range selectedEndpoints {
+								for _, ep := range eps {
+									bdName := fmt.Sprintf("%s-bd", bd.Name)
+									if itfce.Selector != nil {
+										bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
+									}
+
+									self.PopulateIRBInterface(ctx, false, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
+									self.PopulateIRBInterface(ctx, true, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
+								}
 							}
 						}
 					}
 				}
-
 				return nil
 			}
+			// non irb interfaces
 			selector := &metav1.LabelSelector{}
 			if itfce.Selector != nil {
 				selector = itfce.Selector
