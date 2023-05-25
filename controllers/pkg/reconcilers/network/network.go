@@ -29,6 +29,7 @@ import (
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
+	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	"github.com/srl-labs/ygotsrl/v22"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,22 +40,25 @@ import (
 type network struct {
 	*infrav1alpha1.Network
 	resource.APIPatchingApplicator
-	apply     bool
-	devices   map[string]*ygotsrl.Device
-	resources map[corev1.ObjectReference]client.Object
-	eps       *endpoints
-	hash      hash.HashTable
+	apply           bool
+	devices         map[string]*ygotsrl.Device
+	resources       map[corev1.ObjectReference]client.Object
+	eps             *endpoints
+	hash            hash.HashTable
+	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
+	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]
 }
 
 func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable) client.Object {
 	// create VLAN DataBase
-	o := ipamv1alpha1.BuildNetworkInstance(metav1.ObjectMeta{
-		Name:            fmt.Sprintf("%s-rt", rt.Name),
-		Namespace:       r.Namespace,
-		OwnerReferences: []metav1.OwnerReference{{APIVersion: r.APIVersion, Kind: r.Kind, Name: r.Name, UID: r.UID, Controller: pointer.Bool(true)}},
-	}, ipamv1alpha1.NetworkInstanceSpec{
-		Prefixes: rt.Prefixes,
-	}, ipamv1alpha1.NetworkInstanceStatus{})
+	o := ipamv1alpha1.BuildNetworkInstance(
+		metav1.ObjectMeta{
+			Name:            fmt.Sprintf("%s-rt", rt.Name),
+			Namespace:       r.Namespace,
+			OwnerReferences: []metav1.OwnerReference{{APIVersion: r.APIVersion, Kind: r.Kind, Name: r.Name, UID: r.UID, Controller: pointer.Bool(true)}},
+		}, ipamv1alpha1.NetworkInstanceSpec{
+			Prefixes: rt.Prefixes,
+		}, ipamv1alpha1.NetworkInstanceStatus{})
 	r.resources[corev1.ObjectReference{APIVersion: o.GetResourceVersion(), Kind: o.GetObjectKind().GroupVersionKind().Kind, Name: o.GetName(), Namespace: o.GetNamespace()}] = o
 	return o
 }
@@ -141,7 +145,6 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 			if err := r.Apply(ctx, o); err != nil {
 				return err
 			}
-			continue
 		}
 
 		for _, itfce := range rt.Interfaces {
@@ -149,6 +152,9 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 				// create IRB + we need to lookup the selectors in the bridge domain
 				for _, bd := range r.Spec.BridgeDomains {
 					if itfce.BridgeDomainName != nil && bd.Name == *itfce.BridgeDomainName {
+						if r.apply {
+							continue
+						}
 						for _, itfce := range bd.Interfaces {
 							selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
 							if err != nil {
@@ -180,6 +186,16 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 					// create BD Index (hash)
 					// allocate VLAN ID
 					rtName := fmt.Sprintf("%s-rt", rt.Name)
+
+					o := r.populateVlanDatabase(selectorName)
+					if r.apply {
+						if err := r.Apply(ctx, o); err != nil {
+							return err
+						}
+						// we can return here since we do another stage
+						continue
+					}
+					
 					vlanId, err := r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
 					if err != nil {
 						return err

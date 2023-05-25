@@ -20,8 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
+	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
@@ -29,9 +31,8 @@ import (
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
+	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	"github.com/openconfig/ygot/ygot"
-
-	//"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 
 	"github.com/pkg/errors"
 	"github.com/srl-labs/ygotsrl/v22"
@@ -66,12 +67,11 @@ const (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[schema.GroupVersionKind]chan event.GenericEvent, error) {
-	/*
-		cfg, ok := c.(*ctrlconfig.ControllerConfig)
-		if !ok {
-			return nil, fmt.Errorf("cannot initialize, expecting controllerConfig, got: %s", reflect.TypeOf(c).Name())
-		}
-	*/
+
+	cfg, ok := c.(*ctrlrconfig.ControllerConfig)
+	if !ok {
+		return nil, fmt.Errorf("cannot initialize, expecting controllerConfig, got: %s", reflect.TypeOf(c).Name())
+	}
 
 	if err := infrav1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		return nil, err
@@ -89,6 +89,8 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[sche
 	r.APIPatchingApplicator = resource.NewAPIPatchingApplicator(mgr.GetClient())
 	r.finalizer = resource.NewAPIFinalizer(mgr.GetClient(), finalizer)
 	r.devices = map[string]*ygotsrl.Device{}
+	r.VlanClientProxy = cfg.VlanClientProxy
+	r.IpamClientProxy = cfg.IpamClientProxy
 
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("NetworkController").
@@ -98,8 +100,9 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[sche
 
 type reconciler struct {
 	resource.APIPatchingApplicator
-	finalizer *resource.APIFinalizer
-	//clientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
+	finalizer       *resource.APIFinalizer
+	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
+	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]
 
 	l       logr.Logger
 	devices map[string]*ygotsrl.Device
@@ -208,11 +211,13 @@ func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha
 
 func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints) error {
 	n := &network{
-		Network:   cr,
-		devices:   map[string]*ygotsrl.Device{},
-		resources: map[corev1.ObjectReference]client.Object{},
-		eps:       eps,
-		hash:      hash.New(10000),
+		Network:         cr,
+		devices:         map[string]*ygotsrl.Device{},
+		resources:       map[corev1.ObjectReference]client.Object{},
+		eps:             eps,
+		hash:            hash.New(10000),
+		IpamClientProxy: r.IpamClientProxy,
+		VlanClientProxy: r.VlanClientProxy,
 	}
 	if err := n.PopulateBridgeDomains(ctx); err != nil {
 		r.l.Error(err, "cannot populate bridgedomains")

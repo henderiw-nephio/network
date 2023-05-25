@@ -24,20 +24,19 @@ import (
 	"github.com/srl-labs/ygotsrl/v22"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 )
 
 // create a VLANDatabase (bdName + "-" + selectorName)
 // create a BridgeDomain (bdName + "-" + selectorName)
 // create BD Index (hash)
-func (self *network) PopulateBridgeDomain(ctx context.Context, nodeName string, selectorName string, bdName string) (uint16, error) {
-	if _, ok := self.devices[nodeName]; !ok {
-		self.devices[nodeName] = new(ygotsrl.Device)
+func (r *network) PopulateBridgeDomain(ctx context.Context, nodeName string, selectorName string, bdName string) (uint16, error) {
+	if _, ok := r.devices[nodeName]; !ok {
+		r.devices[nodeName] = new(ygotsrl.Device)
 	}
 
 	// create ni Intstance and interfaces
-	//bdIndex := self.hash.Insert(bdName, "dummy", map[string]string{})
-	ni := self.devices[nodeName].GetOrCreateNetworkInstance(bdName)
+	//bdIndex := r.hash.Insert(bdName, "dummy", map[string]string{})
+	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
 	ni.BridgeTable = &ygotsrl.SrlNokiaNetworkInstance_NetworkInstance_BridgeTable{
 		MacLearning: &ygotsrl.SrlNokiaNetworkInstance_NetworkInstance_BridgeTable_MacLearning{
@@ -59,35 +58,37 @@ func (self *network) PopulateBridgeDomain(ctx context.Context, nodeName string, 
 			ExportRt: ygot.String(strings.Join([]string{"target", "65555", strconv.Itoa(int(bdIndex))}, ":")),
 		}
 	*/
+	vlanAlloc, err := r.VlanClientProxy.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
+		metav1.ObjectMeta{
+			Name:      bdName,
+			Namespace: r.Namespace,
+		},
+		vlanv1alpha1.VLANAllocationSpec{
+			VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: r.Namespace},
+		},
+		vlanv1alpha1.VLANAllocationStatus{},
+	), nil)
+	if err != nil {
+		return 0, err
+	}
 
 	// allocate vlanID -> vlanDatabase = selectorName, allocName = bdName or rtName
-	return 10, nil
+	return *vlanAlloc.Status.VLANID, nil
 }
 
-func (self *network) PopulateRoutingInstance(ctx context.Context, nodeName string, selectorName string, rtName string) (uint16, error) {
-	if _, ok := self.devices[nodeName]; !ok {
-		self.devices[nodeName] = new(ygotsrl.Device)
+func (r *network) PopulateRoutingInstance(ctx context.Context, nodeName string, selectorName string, rtName string) (uint16, error) {
+	if _, ok := r.devices[nodeName]; !ok {
+		r.devices[nodeName] = new(ygotsrl.Device)
 	}
-	// create VLAN DataBase
-	o := vlanv1alpha1.BuildVLANDatabase(
-		metav1.ObjectMeta{
-			Name:            selectorName, // the vlan db is always the selectorName since the bd is physical and not virtual
-			Namespace:       self.Namespace,
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: self.APIVersion, Kind: self.Kind, Name: self.Name, UID: self.UID, Controller: pointer.Bool(true)}},
-		},
-		vlanv1alpha1.VLANDatabaseSpec{},
-		vlanv1alpha1.VLANDatabaseStatus{},
-	)
-	self.resources[corev1.ObjectReference{APIVersion: o.GetResourceVersion(), Kind: o.GetObjectKind().GroupVersionKind().Kind, Name: o.GetName(), Namespace: o.GetNamespace()}] = o
 
-	ni := self.devices[nodeName].GetOrCreateNetworkInstance(rtName)
+	ni := r.devices[nodeName].GetOrCreateNetworkInstance(rtName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
 	ni.IpForwarding = &ygotsrl.SrlNokiaNetworkInstance_NetworkInstance_IpForwarding{
 		ReceiveIpv4Check: ygot.Bool(true),
 		ReceiveIpv6Check: ygot.Bool(true),
 	}
 	/*
-		rtIndex := self.hash.Insert(rtName + "-" + "rt", "dummy", map[string]string{})
+		rtIndex := r.hash.Insert(rtName + "-" + "rt", "dummy", map[string]string{})
 		bgpEvpn := ni.GetOrCreateProtocols().GetOrCreateBgpEvpn()
 		bgpEvpnBgpInstance := bgpEvpn.GetOrCreateBgpInstance(1)
 		bgpEvpnBgpInstance.AdminState = ygotsrl.SrlNokiaCommon_AdminState_enable
@@ -103,6 +104,19 @@ func (self *network) PopulateRoutingInstance(ctx context.Context, nodeName strin
 		}
 	*/
 
+	vlanAlloc, err := r.VlanClientProxy.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
+		metav1.ObjectMeta{
+			Name:      rtName,
+			Namespace: r.Namespace,
+		},
+		vlanv1alpha1.VLANAllocationSpec{
+			VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: r.Namespace},
+		},
+		vlanv1alpha1.VLANAllocationStatus{},
+	), nil)
+	if err != nil {
+		return 0, err
+	}
 	// allocate vlanID -> vlanDatabase = selectorName, allocName = bdName or rtName
-	return 10, nil
+	return *vlanAlloc.Status.VLANID, nil
 }
