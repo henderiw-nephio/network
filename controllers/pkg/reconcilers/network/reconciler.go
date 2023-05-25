@@ -145,7 +145,10 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	fmt.Println("endpoints", len(eps.Items))
-	fmt.Println("endpoints", eps.Items)
+
+	for _, ep := range eps.Items {
+		fmt.Println("endpoint", ep)
+	}
 
 	if err := r.getNewResources(ctx, cr, eps); err != nil {
 		r.l.Error(err, "cannot get new resources")
