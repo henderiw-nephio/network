@@ -57,11 +57,12 @@ func (self *network) PopulateBridgeDomains(ctx context.Context) error {
 					},
 				}
 			}
+			fmt.Println("selector", selector)
 			selectedEndpoints, err := self.eps.GetEndpointsPerSelector(selector)
 			if err != nil {
 				return err
 			}
-
+			fmt.Println("selectedEndpoints", selectedEndpoints)
 			for selectorName, eps := range selectedEndpoints {
 				for _, ep := range eps {
 					// selectorName is a global unique identity
