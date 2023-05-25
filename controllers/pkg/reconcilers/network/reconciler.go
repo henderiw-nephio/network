@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -186,12 +187,13 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 	}
 	for nodeName, device := range n.devices {
 		r.l.Info("node config", "nodeName", nodeName)
-		json, err := ygot.ConstructInternalJSON(device)
+		j, err := ygot.ConstructInternalJSON(device)
 		if err != nil {
 			r.l.Error(err, "cannot construct json device info")
 			return err
 		}
-		fmt.Println(json)
+		b, err := json.MarshalIndent(j, "", "  ")
+		fmt.Println(b)
 	}
 	for resourceName, r := range n.resources {
 		fmt.Println(resourceName)
