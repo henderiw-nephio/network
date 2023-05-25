@@ -26,9 +26,14 @@ import (
 )
 
 func (self *network) PopulateBridgeInterface(ctx context.Context, bdName string, vlanId uint16, ep invv1alpha1.Endpoint) error {
+	nodeName := ep.Spec.NodeName
+	if _, ok := self.devices[nodeName]; !ok {
+		self.devices[nodeName] = new(ygotsrl.Device)
+	}
+	
 	niItfceSubItfceName := strings.Join([]string{ep.Spec.InterfaceName, strconv.Itoa(int(vlanId))}, ".")
 
-	i := self.devices[ep.Spec.NodeName].GetOrCreateInterface(ep.Spec.InterfaceName)
+	i := self.devices[nodeName].GetOrCreateInterface(ep.Spec.InterfaceName)
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_bridged
 	si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
@@ -38,18 +43,22 @@ func (self *network) PopulateBridgeInterface(ctx context.Context, bdName string,
 			},
 		},
 	}
-	ni := self.devices[ep.Spec.NodeName].GetOrCreateNetworkInstance(bdName)
+	ni := self.devices[nodeName].GetOrCreateNetworkInstance(bdName)
 	ni.GetOrCreateInterface(niItfceSubItfceName)
 	return nil
 }
 
 func (self *network) PopulateRoutedInterface(ctx context.Context, rtName string, vlanId uint16, ep invv1alpha1.Endpoint) error {
+	nodeName := ep.Spec.NodeName
+	if _, ok := self.devices[nodeName]; !ok {
+		self.devices[nodeName] = new(ygotsrl.Device)
+	}
 	// allocate IP = per link (label in ep)
 	// allocate Address based on the link
 	// how to know it is ipv4 or ipv6
 
 	niItfceSubItfceName := strings.Join([]string{ep.Spec.InterfaceName, strconv.Itoa(int(vlanId))}, ".")
-	i := self.devices[ep.Spec.NodeName].GetOrCreateInterface(ep.Spec.InterfaceName)
+	i := self.devices[nodeName].GetOrCreateInterface(ep.Spec.InterfaceName)
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_routed
 	si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
@@ -61,7 +70,7 @@ func (self *network) PopulateRoutedInterface(ctx context.Context, rtName string,
 	}
 	//si.Ipv4
 	//si.IPv6
-	ni := self.devices[ep.Spec.NodeName].GetOrCreateNetworkInstance(rtName)
+	ni := self.devices[nodeName].GetOrCreateNetworkInstance(rtName)
 	ni.GetOrCreateInterface(niItfceSubItfceName)
 	return nil
 }
@@ -69,13 +78,17 @@ func (self *network) PopulateRoutedInterface(ctx context.Context, rtName string,
 const irbInterfaceName = "irb0"
 
 func (self *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName, rtName string, ep invv1alpha1.Endpoint) error {
+	nodeName := ep.Spec.NodeName
+	if _, ok := self.devices[nodeName]; !ok {
+		self.devices[nodeName] = new(ygotsrl.Device)
+	}
 	// allocate IP = per bdName (label in ep)
 	// allocate Address based on the bdName
 	// how to know it is ipv4 or ipv6
 
 	niIndex := self.hash.Insert(bdName, "dummy", map[string]string{})
 	niItfceSubItfceName := strings.Join([]string{irbInterfaceName, strconv.Itoa(int(niIndex))}, ".")
-	i := self.devices[ep.Spec.NodeName].GetOrCreateInterface(irbInterfaceName)
+	i := self.devices[nodeName].GetOrCreateInterface(irbInterfaceName)
 	_ = i.GetOrCreateSubinterface(niIndex)
 
 	if routed {
@@ -89,9 +102,9 @@ func (self *network) PopulateIRBInterface(ctx context.Context, routed bool, bdNa
 			ipv6.NeighborDiscovery.GetOrCreateEvpn().GetOrCreateAdvertise(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
 		*/
 	}
-	ni := self.devices[ep.Spec.NodeName].GetOrCreateNetworkInstance(bdName)
+	ni := self.devices[nodeName].GetOrCreateNetworkInstance(bdName)
 	if routed {
-		ni = self.devices[ep.Spec.NodeName].GetOrCreateNetworkInstance(rtName)
+		ni = self.devices[nodeName].GetOrCreateNetworkInstance(rtName)
 	}
 	ni.GetOrCreateInterface(niItfceSubItfceName)
 	return nil

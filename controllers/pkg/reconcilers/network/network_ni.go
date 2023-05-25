@@ -31,6 +31,9 @@ import (
 // create a BridgeDomain (bdName + "-" + selectorName)
 // create BD Index (hash)
 func (self *network) PopulateBridgeDomain(ctx context.Context, nodeName string, selectorName string, bdName string) (uint16, error) {
+	if _, ok := self.devices[nodeName]; !ok {
+		self.devices[nodeName] = new(ygotsrl.Device)
+	}
 	// create VLAN DataBase
 	o := vlanv1alpha1.BuildVLANDatabase(
 		metav1.ObjectMeta{
@@ -73,7 +76,9 @@ func (self *network) PopulateBridgeDomain(ctx context.Context, nodeName string, 
 }
 
 func (self *network) PopulateRoutingInstance(ctx context.Context, nodeName string, selectorName string, rtName string) (uint16, error) {
-
+	if _, ok := self.devices[nodeName]; !ok {
+		self.devices[nodeName] = new(ygotsrl.Device)
+	}
 	// create VLAN DataBase
 	o := vlanv1alpha1.BuildVLANDatabase(
 		metav1.ObjectMeta{
