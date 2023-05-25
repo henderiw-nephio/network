@@ -144,6 +144,9 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
+	fmt.Println("endpoints", len(eps.Items))
+	fmt.Println("endpoints", eps.Items)
+
 	if err := r.getNewResources(ctx, cr, eps); err != nil {
 		r.l.Error(err, "cannot get new resources")
 		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
