@@ -26,6 +26,7 @@ import (
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
+	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/openconfig/ygot/ygot"
@@ -76,6 +77,9 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[sche
 		return nil, err
 	}
 	if err := ipamv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+		return nil, err
+	}
+	if err := vlanv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		return nil, err
 	}
 	if err := invv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
