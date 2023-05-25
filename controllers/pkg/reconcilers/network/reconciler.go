@@ -150,6 +150,12 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		fmt.Println("endpoint", ep)
 	}
 
+	if err := r.applyInitialresources(ctx, cr, eps); err != nil {
+		r.l.Error(err, "cannot apply initial resources")
+		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
+		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
+
 	if err := r.getNewResources(ctx, cr, eps); err != nil {
 		r.l.Error(err, "cannot get new resources")
 		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
@@ -173,6 +179,27 @@ func (r *reconciler) getProviderEndpoints(ctx context.Context, topology string) 
 		return nil, err
 	}
 	return &endpoints{eps}, nil
+}
+
+func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints) error {
+	n := &network{
+		APIPatchingApplicator: r.APIPatchingApplicator,
+		apply:                 true,
+		Network:               cr,
+		devices:               map[string]*ygotsrl.Device{},
+		resources:             map[corev1.ObjectReference]client.Object{},
+		eps:                   eps,
+		hash:                  hash.New(10000),
+	}
+	if err := n.PopulateBridgeDomains(ctx); err != nil {
+		r.l.Error(err, "cannot populate bridgedomains")
+		return err
+	}
+	if err := n.PopulateRoutingTables(ctx); err != nil {
+		r.l.Error(err, "cannot populate routing Tables")
+		return err
+	}
+	return nil
 }
 
 func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints) error {
