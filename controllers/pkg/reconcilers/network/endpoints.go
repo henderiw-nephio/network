@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -107,7 +108,9 @@ func (self *endpoints) GetEndpointsPerSelector(s *metav1.LabelSelector) (map[str
 
 	iter := self.iterator()
 	if iter.HasNext() {
+		fmt.Println("iterator value", iter.Value())
 		if selector.Matches(labels.Set(iter.Value().Labels)) {
+			fmt.Println("selected value", iter.Value())
 			selectorName := getKeyValueName(labels.Set(iter.Value().Labels), keys)
 			// initialize struct with the selectorName if it does not exist
 			if _, ok := epPerSelector[selectorName]; !ok {
