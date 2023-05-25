@@ -13,14 +13,13 @@ spec:
         nephio.org/nephio.org/prefix-kind: pool
     interfaces:
     - kind: bridgedomain
-      name: internet # irb + cluster prefix is created here
+      bridgeDomainName: internet # irb + cluster prefix is created here
   bridgeDomains: # per selector Key
   - name: internet
     interfaces:
-    - name: all clusters
-      selector:
+    - selector:
         matchExpressions:
-        - {key: nephio.org/cluster-name, operator: exists}
+        - {key: nephio.org/cluster-name, operator: Exists}
       attachmentType: vlan
       
     

@@ -144,7 +144,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if err := r.getNewResources(ctx, cr, eps); err != nil {
-		r.l.Error(err, "cannot add ipam resources")
+		r.l.Error(err, "cannot get new resources")
 		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
@@ -178,15 +178,18 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 	}
 	if err := n.PopulateBridgeDomains(ctx); err != nil {
 		r.l.Error(err, "cannot populate bridgedomains")
+		return err
 	}
 	if err := n.PopulateRoutingTables(ctx); err != nil {
 		r.l.Error(err, "cannot populate routing Tables")
+		return err
 	}
 	for nodeName, device := range n.devices {
 		r.l.Info("node config", "nodeName", nodeName)
 		json, err := ygot.ConstructInternalJSON(device)
 		if err != nil {
 			r.l.Error(err, "cannot construct json device info")
+			return err
 		}
 		fmt.Println(json)
 	}
