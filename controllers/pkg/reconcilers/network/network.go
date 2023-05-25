@@ -67,7 +67,9 @@ func (r *network) populateVlanDatabase(selectorName string) client.Object {
 			Namespace:       r.Namespace,
 			OwnerReferences: []metav1.OwnerReference{{APIVersion: r.APIVersion, Kind: r.Kind, Name: r.Name, UID: r.UID, Controller: pointer.Bool(true)}},
 		},
-		vlanv1alpha1.VLANDatabaseSpec{},
+		vlanv1alpha1.VLANDatabaseSpec{
+			Kind: vlanv1alpha1.VLANDBKindESG,
+		},
 		vlanv1alpha1.VLANDatabaseStatus{},
 	)
 	r.resources[corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace}] = o
