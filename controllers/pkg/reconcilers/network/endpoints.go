@@ -55,7 +55,7 @@ func (self *endpoints) GetUniqueKeyValues(selector labels.Selector, keys []strin
 	lvalues := map[string]struct{}{}
 
 	iter := self.iterator()
-	if iter.HasNext() {
+	for iter.HasNext() {
 		if selector.Matches(labels.Set(iter.Value().Labels)) {
 			selectorName := getKeyValueName(labels.Set(iter.Value().Labels), keys)
 			if _, ok := lvalues[selectorName]; !ok {
@@ -87,7 +87,7 @@ func (self *endpoints) GetNodes(selector labels.Selector) []string {
 	lvalues := map[string]struct{}{}
 
 	iter := self.iterator()
-	if iter.HasNext() {
+	for iter.HasNext() {
 		if selector.Matches(labels.Set(iter.Value().Labels)) {
 			if _, ok := lvalues[iter.Value().Spec.NodeName]; !ok {
 				values = append(values, iter.Value().Spec.NodeName)
@@ -107,7 +107,7 @@ func (self *endpoints) GetEndpointsPerSelector(s *metav1.LabelSelector) (map[str
 	epPerSelector := map[string][]invv1alpha1.Endpoint{}
 
 	iter := self.iterator()
-	if iter.HasNext() {
+	for iter.HasNext() {
 		fmt.Println("iterator value", iter.Value())
 		if selector.Matches(labels.Set(iter.Value().Labels)) {
 			fmt.Println("selected value", iter.Value())
