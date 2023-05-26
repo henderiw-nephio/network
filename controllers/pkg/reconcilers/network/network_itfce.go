@@ -65,7 +65,9 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, selectorName, bdN
 
 	niItfceSubItfceName := strings.Join([]string{ep.Spec.InterfaceName, strconv.Itoa(int(vlanId))}, ".")
 
-	i := r.devices[nodeName].GetOrCreateInterface(ep.Spec.InterfaceName)
+	ifName := strings.ReplaceAll(ep.Spec.InterfaceName, "-", "/")
+	ifName = strings.ReplaceAll(ep.Spec.InterfaceName, "e", "ethernet")
+	i := r.devices[nodeName].GetOrCreateInterface(ifName)
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_bridged
 	si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
@@ -107,7 +109,9 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 	LinkName := fmt.Sprintf("%s-%d", ep.Labels[invv1alpha1.NephioLinkNameKey], vlanId)
 
 	niItfceSubItfceName := strings.Join([]string{ep.Spec.InterfaceName, strconv.Itoa(int(vlanId))}, ".")
-	i := r.devices[nodeName].GetOrCreateInterface(ep.Spec.InterfaceName)
+	ifName := strings.ReplaceAll(ep.Spec.InterfaceName, "-", "/")
+	ifName = strings.ReplaceAll(ep.Spec.InterfaceName, "e", "ethernet")
+	i := r.devices[nodeName].GetOrCreateInterface(ifName)
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_routed
 	si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
@@ -192,12 +196,12 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 		if pi.IsIpv6() {
 			ipv6 := si.GetOrCreateIpv6()
 			ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
-				IpPrefix:  prefixAlloc.Status.Prefix,
+				IpPrefix: prefixAlloc.Status.Prefix,
 			})
 		} else {
 			ipv4 := si.GetOrCreateIpv4()
 			ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
-				IpPrefix:  prefixAlloc.Status.Prefix,
+				IpPrefix: prefixAlloc.Status.Prefix,
 			})
 		}
 		si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
