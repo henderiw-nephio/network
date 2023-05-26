@@ -151,12 +151,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	fmt.Println("endpoints", len(eps.Items))
-
-	for _, ep := range eps.Items {
-		fmt.Println("endpoint", ep)
-	}
-
 	if err := r.applyInitialresources(ctx, cr, eps); err != nil {
 		r.l.Error(err, "cannot apply initial resources")
 		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
@@ -170,7 +164,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	cr.SetConditions(infrav1alpha1.Ready())
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 }
 
 func (r *reconciler) getProviderEndpoints(ctx context.Context, topology string) (*endpoints, error) {
