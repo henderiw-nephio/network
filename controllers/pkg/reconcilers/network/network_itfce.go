@@ -144,8 +144,8 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			pi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
 
 			prefixKind := ipamv1alpha1.PrefixKindNetwork
-			if k, ok := prefix.Labels[allocv1alpha1.NephioPrefixKindKey]; ok {
-				prefixKind = ipamv1alpha1.GetPrefixKindFromString(k)
+			if value, ok := prefix.Labels[allocv1alpha1.NephioPrefixKindKey]; ok {
+				prefixKind = ipamv1alpha1.GetPrefixKindFromString(value)
 			}
 			prefixLength := 24
 			if pi.IsIpv6() {
@@ -163,9 +163,18 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			fmt.Println("prefixKind: ", prefixKind)
 			fmt.Println("af: ", af)
 
+			// add the prefix labels to the prefix selector labels
+			prefixSelectorLabels := map[string]string{}
+			for k, v := range prefix.Labels {
+				if k != allocv1alpha1.NephioPrefixKindKey {
+					prefixSelectorLabels[k] = v
+				}
+			}
+
+			prefixName := fmt.Sprintf(bdName, strings.ReplaceAll(pi.String(), "/", "-"))
 			_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 				metav1.ObjectMeta{
-					Name:      bdName,
+					Name:      prefixName,
 					Namespace: r.Namespace,
 				},
 				ipamv1alpha1.IPAllocationSpec{
@@ -178,6 +187,9 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
 							Labels: labels,
 						},
+						Selector: &metav1.LabelSelector{
+							MatchLabels: prefixSelectorLabels,
+						},
 					},
 				},
 				ipamv1alpha1.IPAllocationStatus{},
@@ -187,9 +199,14 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			}
 			// for network based prefixes i will allocate a gateway IP
 			if prefixKind == ipamv1alpha1.PrefixKindNetwork {
+				// add the selector labels to the labels to ensure we pick the right prefix
+				for k, v := range prefixSelectorLabels {
+					labels[k] = v
+				}
+
 				prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 					metav1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-gateway", bdName),
+						Name:      fmt.Sprintf("%s-gateway", prefixName),
 						Namespace: r.Namespace,
 					},
 					ipamv1alpha1.IPAllocationSpec{
