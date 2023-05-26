@@ -174,8 +174,14 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 										if itfce.Selector != nil {
 											bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
 										}
-										r.PopulateIRBInterface(ctx, false, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce))))
-										r.PopulateIRBInterface(ctx, true, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce))))
+										// populate the bridge part
+										if err := r.PopulateIRBInterface(ctx, false, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
+											return err
+										}
+										// populate the routed part
+										if err := r.PopulateIRBInterface(ctx, true, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
+											return err
+										}
 									}
 								}
 							}
