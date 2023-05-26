@@ -32,7 +32,6 @@ import (
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
-	"github.com/openconfig/gnmi/proto/gnmi"
 	"github.com/openconfig/ygot/ygot"
 
 	"github.com/pkg/errors"
@@ -225,26 +224,31 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 	for nodeName, device := range n.devices {
 		r.l.Info("node config", "nodeName", nodeName)
 
-		m := &Model{
-			ModelData:       make([]*gnmi.ModelData, 0),
-			StructRootType:  reflect.TypeOf((*ygotsrl.Device)(nil)),
-			SchemaTreeRoot:  ygotsrl.SchemaTree["Device"],
-			JsonUnmarshaler: ygotsrl.Unmarshal,
-			EnumData:        ygotsrl.ΛEnum,
-		}
+		/*
+			m := &Model{
+				ModelData:       make([]*gnmi.ModelData, 0),
+				StructRootType:  reflect.TypeOf((*ygotsrl.Device)(nil)),
+				SchemaTreeRoot:  ygotsrl.SchemaTree["Device"],
+				JsonUnmarshaler: ygotsrl.Unmarshal,
+				EnumData:        ygotsrl.ΛEnum,
+			}
+		*/
 
-		j, err := ygot.ConstructInternalJSON(device)
+		j, err := ygot.EmitJSON(device, &ygot.EmitJSONConfig{
+			Format: ygot.RFC7951,
+			Indent: "  ",
+			RFC7951Config: &ygot.RFC7951JSONConfig{
+				AppendModuleName: true,
+			},
+			// debug
+			SkipValidation: false,
+		})
 		if err != nil {
 			r.l.Error(err, "cannot construct json device info")
 			return err
 		}
-		b, _ := json.MarshalIndent(j, "", "  ")
-		fmt.Println(string(b))
+		fmt.Println(j)
 
-		if _, err := m.NewConfigStruct(b, true); err != nil {
-			r.l.Error(err, "failed validation device config")
-			return err
-		}
 	}
 	for resourceName, r := range n.resources {
 		fmt.Println(resourceName)
