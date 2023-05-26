@@ -238,7 +238,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			Format: ygot.RFC7951,
 			Indent: "  ",
 			RFC7951Config: &ygot.RFC7951JSONConfig{
-				AppendModuleName: true,
+				//AppendModuleName: true,
 			},
 			// debug
 			SkipValidation: false,
