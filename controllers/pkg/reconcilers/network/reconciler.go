@@ -233,28 +233,18 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			EnumData:        ygotsrl.ΛEnum,
 		}
 
-		b, err := json.Marshal(device)
-		if err != nil {
-			r.l.Error(err, "cannot marshal device info")
-			return err
-		}
-
-		if _, err := m.NewConfigStruct(b, true); err != nil {
-			r.l.Error(err, "failed validation device config")
-			return err
-		}
-
-		if err := device.Validate(); err != nil {
-			r.l.Error(err, "cannot construct json device info")
-			return err
-		}
 		j, err := ygot.ConstructInternalJSON(device)
 		if err != nil {
 			r.l.Error(err, "cannot construct json device info")
 			return err
 		}
-		b, _ = json.MarshalIndent(j, "", "  ")
+		b, _ := json.MarshalIndent(j, "", "  ")
 		fmt.Println(string(b))
+
+		if _, err := m.NewConfigStruct(b, true); err != nil {
+			r.l.Error(err, "failed validation device config")
+			return err
+		}
 	}
 	for resourceName, r := range n.resources {
 		fmt.Println(resourceName)
