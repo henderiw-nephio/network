@@ -51,7 +51,7 @@ type network struct {
 }
 
 func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable) client.Object {
-	// create VLAN DataBase
+	// create IPAM NetworkInstance
 	o := ipamv1alpha1.BuildNetworkInstance(
 		metav1.ObjectMeta{
 			Name:            fmt.Sprintf("%s-rt", rt.Name),
@@ -83,6 +83,9 @@ func (r *network) populateVlanDatabase(selectorName string) client.Object {
 
 func (r *network) PopulateBridgeDomains(ctx context.Context) error {
 	for _, bd := range r.Spec.BridgeDomains {
+		// tracker tracks if we already initialized the context
+		// it ensure we dont duplicate allocations, etc etc
+		tr := NewTracker()
 		for _, itfce := range bd.Interfaces {
 			selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
 			if err != nil {
@@ -90,33 +93,35 @@ func (r *network) PopulateBridgeDomains(ctx context.Context) error {
 			}
 			for selectorName, eps := range selectedEndpoints {
 				for _, ep := range eps {
-					// selectorName is a global unique identity (interface/node or a grouping like clusters)
-					bdName := fmt.Sprintf("%s-bd", bd.Name)
-					if itfce.Selector != nil {
-						bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
-					}
+					if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
+						// selectorName is a global unique identity (interface/node or a grouping like clusters)
+						bdName := fmt.Sprintf("%s-bd", bd.Name)
+						if itfce.Selector != nil {
+							bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
+						}
 
-					// create a VLANDatabase (based on selectorName)
-					if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-						o := r.populateVlanDatabase(selectorName)
-						if r.apply {
-							if err := r.Apply(ctx, o); err != nil {
-								return err
+						// create a VLANDatabase (based on selectorName)
+						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
+							o := r.populateVlanDatabase(selectorName)
+							if r.apply {
+								if err := r.Apply(ctx, o); err != nil {
+									return err
+								}
+								// we can continue here since we do another stage
+								continue
 							}
-							// we can continue here since we do another stage
-							continue
+						} else {
+							if r.apply {
+								continue
+							}
 						}
-					} else {
-						if r.apply {
-							continue
-						}
-					}
 
-					// create bridgedomain (bdname) + create a bd index
-					r.PopulateBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
-					// create interface/subinterface + networkInstance interface
-					if err := r.PopulateBridgeInterface(ctx, selectorName, bdName, ep, itfce.AttachmentType); err != nil {
-						return err
+						// create bridgedomain (bdname) + create a bd index
+						r.PopulateBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
+						// create interface/subinterface + networkInstance interface
+						if err := r.PopulateBridgeInterface(ctx, selectorName, bdName, ep, itfce.AttachmentType); err != nil {
+							return err
+						}
 					}
 				}
 			}
@@ -168,7 +173,7 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 							}
 							for selectorName, eps := range selectedEndpoints {
 								for _, ep := range eps {
-									if !tr.IsDone(ep.Spec.NodeName, selectorName) {
+									if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
 										rtName := fmt.Sprintf("%s-rt", rt.Name)
 										bdName := fmt.Sprintf("%s-bd", bd.Name)
 										if itfce.Selector != nil {
@@ -190,38 +195,42 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 				}
 				return nil
 			}
-			// non irb interfaces
+			// non IRB interfaces
+
+			// tracker tracks if we already initialized the context
+			// it ensure we dont duplicate allocations, etc etc
+			tr := NewTracker()
+
 			selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
 			if err != nil {
 				return err
 			}
 			for selectorName, eps := range selectedEndpoints {
 				for _, ep := range eps {
-					// create a VLANDB (selectorName) -> to be done earlier
-					// create BD Index (hash)
-					// allocate VLAN ID
-					rtName := fmt.Sprintf("%s-rt", rt.Name)
+					if !tr.IsAlreadyDone(ep.Spec.NodeName, ep.Spec.InterfaceName) {
+						rtName := fmt.Sprintf("%s-rt", rt.Name)
 
-					if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-						o := r.populateVlanDatabase(selectorName)
-						if r.apply {
-							if err := r.Apply(ctx, o); err != nil {
-								return err
+						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
+							o := r.populateVlanDatabase(selectorName)
+							if r.apply {
+								if err := r.Apply(ctx, o); err != nil {
+									return err
+								}
+								// we can return here since we do another stage
+								continue
 							}
-							// we can return here since we do another stage
-							continue
+						} else {
+							if r.apply {
+								// we can return here since we do another stage
+								continue
+							}
 						}
-					} else {
-						if r.apply {
-							// we can return here since we do another stage
-							continue
-						}
-					}
 
-					r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
-					// create interface/subinterface +  networkInstance interface
-					if err := r.PopulateRoutedInterface(ctx, selectorName, rtName, ep, itfce.AttachmentType); err != nil {
-						return err
+						r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
+						// create interface/subinterface + networkInstance interface +
+						if err := r.PopulateRoutedInterface(ctx, selectorName, rtName, ep, itfce.AttachmentType, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
+							return err
+						}
 					}
 				}
 			}

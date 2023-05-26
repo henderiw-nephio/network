@@ -19,7 +19,7 @@ package network
 import "sync"
 
 type Tracker interface {
-	IsDone(nodeName string, selectorName string) bool
+	IsAlreadyDone(nodeName string, selectorName string) bool
 }
 
 func NewTracker() Tracker {
@@ -31,16 +31,16 @@ type tracker struct {
 	t map[string]map[string]struct{}
 }
 
-func (r *tracker) IsDone(nodeName string, selectorName string) bool {
+func (r *tracker) IsAlreadyDone(nodeName string, groupName string) bool {
 	r.m.Lock()
 	defer r.m.Unlock()
 	if _, ok := r.t[nodeName]; !ok {
 		r.t[nodeName] = map[string]struct{}{}
-		r.t[nodeName][selectorName] = struct{}{}
+		r.t[nodeName][groupName] = struct{}{}
 		return false
 	}
-	if _, ok := r.t[nodeName][selectorName]; !ok {
-		r.t[nodeName][selectorName] = struct{}{}
+	if _, ok := r.t[nodeName][groupName]; !ok {
+		r.t[nodeName][groupName] = struct{}{}
 		return false
 	}
 	return true
