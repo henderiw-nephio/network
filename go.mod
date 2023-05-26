@@ -14,6 +14,8 @@ require (
 	github.com/nephio-project/api v0.0.0-20230522173958-63a41669b495
 	github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230523155359-0d37fc7f7a8d
 	github.com/nokia/k8s-ipam v0.0.4-0.20230525121133-7dc8c1b67dc9
+	github.com/openconfig/gnmi v0.0.0-20220920173703-480bf53a74d2
+	github.com/openconfig/goyang v1.2.0
 	github.com/openconfig/ygot v0.25.6
 	github.com/pkg/errors v0.9.1
 	github.com/srl-labs/ygotsrl/v22 v22.11.1
@@ -56,8 +58,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/openconfig/gnmi v0.0.0-20220920173703-480bf53a74d2 // indirect
-	github.com/openconfig/goyang v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.15.1 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
