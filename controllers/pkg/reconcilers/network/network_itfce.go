@@ -172,6 +172,9 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			}
 
 			fmt.Println("prefixSelectorLabels", prefixSelectorLabels)
+			for k, v := range prefixSelectorLabels {
+				labels[k] = v
+			}
 
 			prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
 			_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
@@ -202,9 +205,6 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			// for network based prefixes i will allocate a gateway IP
 			if prefixKind == ipamv1alpha1.PrefixKindNetwork {
 				// add the selector labels to the labels to ensure we pick the right prefix
-				for k, v := range prefixSelectorLabels {
-					labels[k] = v
-				}
 
 				prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 					metav1.ObjectMeta{
