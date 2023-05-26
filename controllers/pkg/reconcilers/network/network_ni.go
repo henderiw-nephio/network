@@ -19,17 +19,14 @@ package network
 import (
 	"context"
 
-	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// create a VLANDatabase (bdName + "-" + selectorName)
 // create a BridgeDomain (bdName + "-" + selectorName)
 // create BD Index (hash)
-func (r *network) PopulateBridgeDomain(ctx context.Context, nodeName string, selectorName string, bdName string) (uint16, error) {
+func (r *network) PopulateBridgeDomain(ctx context.Context, nodeName, selectorName, bdName string) {
+	// get device context
 	if _, ok := r.devices[nodeName]; !ok {
 		r.devices[nodeName] = new(ygotsrl.Device)
 	}
@@ -58,25 +55,10 @@ func (r *network) PopulateBridgeDomain(ctx context.Context, nodeName string, sel
 			ExportRt: ygot.String(strings.Join([]string{"target", "65555", strconv.Itoa(int(bdIndex))}, ":")),
 		}
 	*/
-	vlanAlloc, err := r.VlanClientProxy.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
-		metav1.ObjectMeta{
-			Name:      bdName,
-			Namespace: r.Namespace,
-		},
-		vlanv1alpha1.VLANAllocationSpec{
-			VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: r.Namespace},
-		},
-		vlanv1alpha1.VLANAllocationStatus{},
-	), nil)
-	if err != nil {
-		return 0, err
-	}
-
-	// allocate vlanID -> vlanDatabase = selectorName, allocName = bdName or rtName
-	return *vlanAlloc.Status.VLANID, nil
+	return
 }
 
-func (r *network) PopulateRoutingInstance(ctx context.Context, nodeName string, selectorName string, rtName string) (uint16, error) {
+func (r *network) PopulateRoutingInstance(ctx context.Context, nodeName, selectorName, rtName string) {
 	if _, ok := r.devices[nodeName]; !ok {
 		r.devices[nodeName] = new(ygotsrl.Device)
 	}
@@ -103,20 +85,5 @@ func (r *network) PopulateRoutingInstance(ctx context.Context, nodeName string, 
 			ExportRt: ygot.String(strings.Join([]string{"target", "65555", strconv.Itoa(int(rtIndex))}, ":")),
 		}
 	*/
-
-	vlanAlloc, err := r.VlanClientProxy.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
-		metav1.ObjectMeta{
-			Name:      rtName,
-			Namespace: r.Namespace,
-		},
-		vlanv1alpha1.VLANAllocationSpec{
-			VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: r.Namespace},
-		},
-		vlanv1alpha1.VLANAllocationStatus{},
-	), nil)
-	if err != nil {
-		return 0, err
-	}
-	// allocate vlanID -> vlanDatabase = selectorName, allocName = bdName or rtName
-	return *vlanAlloc.Status.VLANID, nil
+	return
 }

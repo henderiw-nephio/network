@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 
 	//ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
@@ -89,32 +90,34 @@ func (r *network) PopulateBridgeDomains(ctx context.Context) error {
 			}
 			for selectorName, eps := range selectedEndpoints {
 				for _, ep := range eps {
-					// selectorName is a global unique identity
-					// create a VLANDatabase (selectorName)
-					// create a BridgeDomain (bdName + "-" + selectorName + "bd")
-					// create BD Index (hash)
-					// allocate VLAN ID
+					// selectorName is a global unique identity (interface/node or a grouping like clusters)
 					bdName := fmt.Sprintf("%s-bd", bd.Name)
 					if itfce.Selector != nil {
 						bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
 					}
 
-					o := r.populateVlanDatabase(selectorName)
-					if r.apply {
-						if err := r.Apply(ctx, o); err != nil {
-							return err
+					// create a VLANDatabase (based on selectorName)
+					if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
+						o := r.populateVlanDatabase(selectorName)
+						if r.apply {
+							if err := r.Apply(ctx, o); err != nil {
+								return err
+							}
+							// we can continue here since we do another stage
+							continue
 						}
-						// we can return here since we do another stage
-						continue
+					} else {
+						if r.apply {
+							continue
+						}
 					}
 
-					vlanId, err := r.PopulateBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
-					if err != nil {
+					// create bridgedomain (bdname) + create a bd index
+					r.PopulateBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
+					// create interface/subinterface + networkInstance interface
+					if err := r.PopulateBridgeInterface(ctx, selectorName, bdName, ep, itfce.AttachmentType); err != nil {
 						return err
 					}
-					// create interface/subinterface
-					// create networkInstance interface
-					r.PopulateBridgeInterface(ctx, bdName, vlanId, ep)
 				}
 			}
 		}
@@ -149,12 +152,15 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 
 		for _, itfce := range rt.Interfaces {
 			if itfce.Kind == infrav1alpha1.InterfaceKindBridgeDomain {
-				// create IRB + we need to lookup the selectors in the bridge domain
+				// create IRB + we lookup the interfaces/selectors in the bridge domain
 				for _, bd := range r.Spec.BridgeDomains {
 					if itfce.BridgeDomainName != nil && bd.Name == *itfce.BridgeDomainName {
 						if r.apply {
 							continue
 						}
+						// tracker tracks if we already initialized the context
+						// it ensure we dont duplicate allocations, etc etc
+						tr := NewTracker()
 						for _, itfce := range bd.Interfaces {
 							selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
 							if err != nil {
@@ -162,12 +168,15 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 							}
 							for selectorName, eps := range selectedEndpoints {
 								for _, ep := range eps {
-									bdName := fmt.Sprintf("%s-bd", bd.Name)
-									if itfce.Selector != nil {
-										bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
+									if !tr.IsDone(ep.Spec.NodeName, "dummmy") {
+										rtName := fmt.Sprintf("%s-rt", rt.Name)
+										bdName := fmt.Sprintf("%s-bd", bd.Name)
+										if itfce.Selector != nil {
+											bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
+										}
+										r.PopulateIRBInterface(ctx, false, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce))))
+										r.PopulateIRBInterface(ctx, true, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce))))
 									}
-									r.PopulateIRBInterface(ctx, false, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
-									r.PopulateIRBInterface(ctx, true, bdName, fmt.Sprintf("%s-rt", rt.Name), ep)
 								}
 							}
 						}
@@ -187,22 +196,27 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 					// allocate VLAN ID
 					rtName := fmt.Sprintf("%s-rt", rt.Name)
 
-					o := r.populateVlanDatabase(selectorName)
-					if r.apply {
-						if err := r.Apply(ctx, o); err != nil {
-							return err
+					if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
+						o := r.populateVlanDatabase(selectorName)
+						if r.apply {
+							if err := r.Apply(ctx, o); err != nil {
+								return err
+							}
+							// we can return here since we do another stage
+							continue
 						}
-						// we can return here since we do another stage
-						continue
+					} else {
+						if r.apply {
+							// we can return here since we do another stage
+							continue
+						}
 					}
-					
-					vlanId, err := r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
-					if err != nil {
+
+					r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
+					// create interface/subinterface +  networkInstance interface
+					if err := r.PopulateRoutedInterface(ctx, selectorName, rtName, ep, itfce.AttachmentType); err != nil {
 						return err
 					}
-					// create interface/subinterface
-					// create networkInstance interface
-					r.PopulateRoutedInterface(ctx, rtName, vlanId, ep)
 				}
 			}
 		}

@@ -43,6 +43,8 @@ func getKeys(s *metav1.LabelSelector) []string {
 	return keys
 }
 
+
+
 func (self *endpoints) iterator() *iterator[invv1alpha1.Endpoint] {
 	return &iterator[invv1alpha1.Endpoint]{curIdx: -1, items: self.Items}
 }

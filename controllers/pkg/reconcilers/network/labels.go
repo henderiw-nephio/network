@@ -16,18 +16,16 @@ limitations under the License.
 
 package network
 
-import (
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
-	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
-)
-
-func getClusterLabels(labels map[string]string, clusterName string) map[string]string {
-	l := map[string]string{}
+// getSelectorLabels return the labels of the real data endpoint
+// based on the leys we used to select the endpoints
+func getSelectorLabels(labels map[string]string, keys []string) map[string]string {
+	selectorLabels := map[string]string{}
 	for k, v := range labels {
-		l[k] = v
+		for _, key := range keys {
+			if k == key {
+				selectorLabels[k] = v
+			}
+		}
 	}
-	l[invv1alpha1.NephioClusterNameKey] = clusterName
-	// update labels - defaulting to prefixkind = network and gateway true
-	l[allocv1alpha1.NephioGatewayKey] = "true"
-	return l
+	return selectorLabels
 }

@@ -9,6 +9,9 @@ metadata:
 spec:
   group: infra.nephio.org
   names:
+    categories:
+    - nephio
+    - network
     kind: Network
     listKind: NetworkList
     plural: networks
