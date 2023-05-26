@@ -67,6 +67,9 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, selectorName, bdN
 	ifName = strings.ReplaceAll(ifName, "e", "ethernet-")
 	niItfceSubItfceName := strings.Join([]string{ifName, strconv.Itoa(int(vlanId))}, ".")
 	i := r.devices[nodeName].GetOrCreateInterface(ifName)
+	if attachmentType == reqv1alpha1.AttachmentTypeVLAN {
+		i.VlanTagging = ygot.Bool(true)
+	}
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_bridged
 	si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
@@ -110,6 +113,10 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 	ifName = strings.ReplaceAll(ifName, "e", "ethernet-")
 	niItfceSubItfceName := strings.Join([]string{ifName, strconv.Itoa(int(vlanId))}, ".")
 	i := r.devices[nodeName].GetOrCreateInterface(ifName)
+	if attachmentType == reqv1alpha1.AttachmentTypeVLAN {
+		i.VlanTagging = ygot.Bool(true)
+	}
+
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_routed
 	si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
