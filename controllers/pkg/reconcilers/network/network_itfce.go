@@ -250,9 +250,7 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 				}
 				si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
 			}
-
 		}
-
 	}
 	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
 	if routed {
