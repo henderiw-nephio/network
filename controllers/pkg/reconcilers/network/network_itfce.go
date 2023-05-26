@@ -158,6 +158,11 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 				}
 			}
 			af := pi.GetAddressFamily()
+
+			fmt.Println("prefix: ", prefix)
+			fmt.Println("prefixKind: ", prefixKind)
+			fmt.Println("af: ", af)
+
 			_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 				metav1.ObjectMeta{
 					Name:      bdName,
@@ -192,6 +197,11 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 						NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: r.Namespace},
 						AddressFamily:   &af,
 						AllocationLabels: allocv1alpha1.AllocationLabels{
+							UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+								Labels: map[string]string{
+									allocv1alpha1.NephioGatewayKey: "true",
+								},
+							},
 							Selector: &metav1.LabelSelector{
 								MatchLabels: labels,
 							},

@@ -168,7 +168,7 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 							}
 							for selectorName, eps := range selectedEndpoints {
 								for _, ep := range eps {
-									if !tr.IsDone(ep.Spec.NodeName, "dummmy") {
+									if !tr.IsDone(ep.Spec.NodeName, selectorName) {
 										rtName := fmt.Sprintf("%s-rt", rt.Name)
 										bdName := fmt.Sprintf("%s-bd", bd.Name)
 										if itfce.Selector != nil {
