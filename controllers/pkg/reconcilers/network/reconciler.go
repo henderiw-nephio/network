@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	"github.com/henderiw-nephio/network/pkg/targets"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
@@ -32,12 +33,15 @@ import (
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
+	"github.com/openconfig/gnmic/api"
 	"github.com/openconfig/ygot/ygot"
+	"google.golang.org/protobuf/encoding/prototext"
 
 	"github.com/pkg/errors"
 	"github.com/srl-labs/ygotsrl/v22"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -93,6 +97,7 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[sche
 	r.devices = map[string]*ygotsrl.Device{}
 	r.VlanClientProxy = cfg.VlanClientProxy
 	r.IpamClientProxy = cfg.IpamClientProxy
+	r.targets = cfg.Targets
 
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("NetworkController").
@@ -108,6 +113,7 @@ type reconciler struct {
 
 	l       logr.Logger
 	devices map[string]*ygotsrl.Device
+	targets targets.Target
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -224,17 +230,15 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 		return err
 	}
 
-
 	for nodeName, device := range n.devices {
 		r.l.Info("node config", "nodeName", nodeName)
 
 		j, err := ygot.EmitJSON(device, &ygot.EmitJSONConfig{
-			Format: ygot.RFC7951,
-			Indent: "  ",
+			Format:        ygot.RFC7951,
+			Indent:        "  ",
 			RFC7951Config: &ygot.RFC7951JSONConfig{
-				//AppendModuleName: true,
+				AppendModuleName: true,
 			},
-			// debug
 			SkipValidation: false,
 		})
 		if err != nil {
@@ -243,7 +247,23 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 		}
 		fmt.Println(j)
 
-		
+		tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
+		if tg == nil {
+			return fmt.Errorf("no target client available")
+		}
+		setReq, err := api.NewSetRequest(
+			api.Update(
+				api.Path("/"),
+				api.Value(j, "json_ietf"),
+			))
+		if err != nil {
+			return err
+		}
+		setResp, err := tg.Set(ctx, setReq)
+		if err != nil {
+			return err
+		}
+		fmt.Println(prototext.Format(setResp))
 
 	}
 	for resourceName, r := range n.resources {
@@ -253,109 +273,3 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 	}
 	return nil
 }
-
-/*
-func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints) error {
-	for _, nodeName := range eps.GetNodes() {
-		r.devices[nodeName] = new(ygotsrl.Device)
-	}
-
-	for _, rt := range cr.Spec.RoutingTables {
-		// create ipam network instance
-		niName := fmt.Sprintf("rt-%s", rt.Name)
-		ni := ipamv1alpha1.BuildNetworkInstance(metav1.ObjectMeta{
-			Name:            niName,
-			Namespace:       cr.Namespace,
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
-		}, ipamv1alpha1.NetworkInstanceSpec{
-			Prefixes: rt.Prefixes,
-		}, ipamv1alpha1.NetworkInstanceStatus{})
-
-		if err := r.Apply(ctx, ni); err != nil {
-			cr.SetConditions(infrav1alpha1.Failed(err.Error()))
-			r.l.Error(err, "cannot create ipam network instance")
-			return err
-		}
-		r.l.Info("ipam network instance created", "name", fmt.Sprintf("rt-%s", rt.Name))
-
-		for _, nodeName := range eps.GetNodes() {
-			d := r.devices[nodeName]
-			ni := d.GetOrCreateNetworkInstance(niName)
-			ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
-			ni.IpForwarding = &ygotsrl.SrlNokiaNetworkInstance_NetworkInstance_IpForwarding{
-				ReceiveIpv4Check: ygot.Bool(true),
-				ReceiveIpv6Check: ygot.Bool(true),
-			}
-		}
-
-		rtable := table.NewRIB()
-		for _, prefix := range rt.Prefixes {
-			mpi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
-
-			// defaults to prefixKind network
-			prefixKind := ipamv1alpha1.PrefixKindNetwork
-			prefixLength := 24
-			labels := map[string]string{
-				allocv1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindNetwork),
-			}
-			if k, ok := prefix.Labels[allocv1alpha1.NephioPrefixKindKey]; ok {
-				labels[allocv1alpha1.NephioPrefixKindKey] = k
-				prefixKind = ipamv1alpha1.GetPrefixKindFromString(k)
-				prefixLength = 16
-			}
-			// add additional labels from the prefix Spec
-			for k, v := range prefix.Labels {
-				labels[k] = v
-			}
-			// add the route to the routing table
-			route := table.NewRoute(mpi.GetIPPrefix(), labels, nil)
-			rtable.Add(route)
-
-			for _, bd := range rt.BridgeDomains {
-				for _, clusterName := range eps.GetClusters() {
-
-					p := rtable.GetAvailablePrefixByBitLen(mpi.GetIPPrefix(), uint8(prefixLength))
-					// add clusterName to the labels
-					labels := getClusterLabels(labels, clusterName)
-
-					// the default gw is .1
-					pi := iputil.NewPrefixInfo(netip.PrefixFrom(p.Addr().Next(), 24))
-					if prefixKind != ipamv1alpha1.PrefixKindNetwork {
-						// update labels for now gateways
-						delete(labels, allocv1alpha1.NephioGatewayKey)
-						pi = iputil.NewPrefixInfo(netip.PrefixFrom(p.Addr(), 24))
-					}
-					route := table.NewRoute(pi.GetIPPrefix(), labels, nil)
-					rtable.Add(route)
-
-					prefix := ipamv1alpha1.BuildIPPrefix(metav1.ObjectMeta{
-						Name:            fmt.Sprintf("%s-%s-%s", clusterName, *bd.Name, strings.ReplaceAll(p.String(), "/", "-")),
-						Namespace:       cr.Namespace,
-						OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
-					}, ipamv1alpha1.IPPrefixSpec{
-						Kind:            prefixKind,
-						NetworkInstance: corev1.ObjectReference{Name: fmt.Sprintf("rt-%s", rt.Name)},
-						Prefix:          pi.String(),
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-							Labels: labels,
-						},
-					}, ipamv1alpha1.IPPrefixStatus{})
-
-					if err := r.Apply(ctx, prefix); err != nil {
-						cr.SetConditions(infrav1alpha1.Failed(err.Error()))
-						r.l.Error(err, "cannot create ipam prefix")
-						return err
-					}
-
-					for _, nodeName := range eps.GetNodes() {
-						d := r.devices[nodeName]
-						ni := d.GetOrCreateNetworkInstance(niName)
-						ni.GetOrCreateInterface()
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
-*/

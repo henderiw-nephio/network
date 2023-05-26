@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	"github.com/henderiw-nephio/network/pkg/targets"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 
@@ -48,6 +49,7 @@ type network struct {
 	hash            hash.HashTable
 	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
 	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]
+	targets         targets.Target
 }
 
 func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable) client.Object {
