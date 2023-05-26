@@ -63,10 +63,9 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, selectorName, bdN
 		vlanId = *vlanAlloc.Status.VLANID
 	}
 
-	niItfceSubItfceName := strings.Join([]string{ep.Spec.InterfaceName, strconv.Itoa(int(vlanId))}, ".")
-
 	ifName := strings.ReplaceAll(ep.Spec.InterfaceName, "-", "/")
 	ifName = strings.ReplaceAll(ep.Spec.InterfaceName, "e", "ethernet")
+	niItfceSubItfceName := strings.Join([]string{ifName, strconv.Itoa(int(vlanId))}, ".")
 	i := r.devices[nodeName].GetOrCreateInterface(ifName)
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_bridged
@@ -107,10 +106,9 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 	}
 
 	LinkName := fmt.Sprintf("%s-%d", ep.Labels[invv1alpha1.NephioLinkNameKey], vlanId)
-
-	niItfceSubItfceName := strings.Join([]string{ep.Spec.InterfaceName, strconv.Itoa(int(vlanId))}, ".")
 	ifName := strings.ReplaceAll(ep.Spec.InterfaceName, "-", "/")
 	ifName = strings.ReplaceAll(ep.Spec.InterfaceName, "e", "ethernet")
+	niItfceSubItfceName := strings.Join([]string{ifName, strconv.Itoa(int(vlanId))}, ".")
 	i := r.devices[nodeName].GetOrCreateInterface(ifName)
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_routed
