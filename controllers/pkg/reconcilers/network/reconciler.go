@@ -64,6 +64,8 @@ const (
 //+kubebuilder:rbac:groups=ipam.alloc.nephio.org,resources=ipprefixes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=inv.nephio.org,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=inv.nephio.org,resources=endpoints/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=inv.nephio.org,resources=targets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=inv.nephio.org,resources=targets/status,verbs=get;update;patch
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[schema.GroupVersionKind]chan event.GenericEvent, error) {
@@ -221,18 +223,10 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 		r.l.Error(err, "cannot populate routing Tables")
 		return err
 	}
+
+
 	for nodeName, device := range n.devices {
 		r.l.Info("node config", "nodeName", nodeName)
-
-		/*
-			m := &Model{
-				ModelData:       make([]*gnmi.ModelData, 0),
-				StructRootType:  reflect.TypeOf((*ygotsrl.Device)(nil)),
-				SchemaTreeRoot:  ygotsrl.SchemaTree["Device"],
-				JsonUnmarshaler: ygotsrl.Unmarshal,
-				EnumData:        ygotsrl.ΛEnum,
-			}
-		*/
 
 		j, err := ygot.EmitJSON(device, &ygot.EmitJSONConfig{
 			Format: ygot.RFC7951,
@@ -248,6 +242,8 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			return err
 		}
 		fmt.Println(j)
+
+		
 
 	}
 	for resourceName, r := range n.resources {

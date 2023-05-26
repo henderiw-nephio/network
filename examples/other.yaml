@@ -16,8 +16,8 @@ spec:
         nephio.org/purpose: pool
     interfaces:
     - kind: bridgedomain
-      bridgeDomainName: internet # irb + cluster prefix is created here
-  bridgeDomains: # per selector Key
+      bridgeDomainName: internet 
+  bridgeDomains: 
   - name: internet
     interfaces:
     - selector:
