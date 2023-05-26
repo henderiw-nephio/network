@@ -66,6 +66,7 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[sche
 		return nil, err
 	}
 
+	r.Client = mgr.GetClient()
 	r.finalizer = resource.NewAPIFinalizer(mgr.GetClient(), finalizer)
 	r.targets = cfg.Targets
 
