@@ -64,7 +64,7 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, selectorName, bdN
 	}
 
 	ifName := strings.ReplaceAll(ep.Spec.InterfaceName, "-", "/")
-	ifName = strings.ReplaceAll(ep.Spec.InterfaceName, "e", "ethernet-")
+	ifName = strings.ReplaceAll(ifName, "e", "ethernet-")
 	niItfceSubItfceName := strings.Join([]string{ifName, strconv.Itoa(int(vlanId))}, ".")
 	i := r.devices[nodeName].GetOrCreateInterface(ifName)
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
@@ -107,7 +107,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 
 	LinkName := fmt.Sprintf("%s-%d", ep.Labels[invv1alpha1.NephioLinkNameKey], vlanId)
 	ifName := strings.ReplaceAll(ep.Spec.InterfaceName, "-", "/")
-	ifName = strings.ReplaceAll(ep.Spec.InterfaceName, "e", "ethernet-")
+	ifName = strings.ReplaceAll(ifName, "e", "ethernet-")
 	niItfceSubItfceName := strings.Join([]string{ifName, strconv.Itoa(int(vlanId))}, ".")
 	i := r.devices[nodeName].GetOrCreateInterface(ifName)
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
