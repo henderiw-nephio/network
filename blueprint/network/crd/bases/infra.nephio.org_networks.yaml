@@ -38,31 +38,34 @@ spec:
             description: NetworkSpec defines the desired state of Network
             properties:
               bridgeDomains:
+                description: BridgeDomains define a set of logical ports that share the same flooding or broadcast characteristics. Like a virtual LAN (VLAN), a bridge domain spans one or more ports of multiple devices.
                 items:
                   properties:
                     interfaces:
+                      description: Interfaces defines the interfaces belonging to the bridge domain
                       items:
                         properties:
                           attachmentType:
-                            description: AttachmentType defines if the interface is attached using a vlan or not
+                            description: 'AttachmentType defines the interface attachement: vlan or none'
                             enum:
                             - none
                             - vlan
                             type: string
                           bridgeDomainName:
-                            description: BridgeDomainName defines the name of the bridgeDomain
+                            description: BridgeDomainName defines the name of the bridgeDomain belonging to the interface
                             type: string
                           interfaceName:
                             description: InterfaceName defines the name of the interface
                             type: string
                           kind:
                             default: interface
+                            description: Kind defines the kind of interface. Attached to a routing table both interface and bridgedomain interfaces are allowed. In a BridgeDomain only regular interfaces are allowed
                             enum:
                             - interface
                             - bridgedomain
                             type: string
                           nodeName:
-                            description: NodeName defines the name of the node the interface belongs to
+                            description: NodeName defines the name of the node the interface belongs to interface
                             type: string
                           selector:
                             description: Selector defines the selector criterias for the interface selection
@@ -100,37 +103,41 @@ spec:
                         type: object
                       type: array
                     name:
+                      description: Name defines the name of the bridge domain
                       type: string
                   required:
                   - name
                   type: object
                 type: array
               routingTables:
+                description: RoutingTables defines a set of routes belonging to a given routing instance Multiple routing tables are also called virtual routing instances. Each virtual routing instance can hold overlapping IP information A routing table supports both ipv4 and ipv6
                 items:
                   properties:
                     interfaces:
+                      description: Interfaces defines the interfaces belonging to the routing table
                       items:
                         properties:
                           attachmentType:
-                            description: AttachmentType defines if the interface is attached using a vlan or not
+                            description: 'AttachmentType defines the interface attachement: vlan or none'
                             enum:
                             - none
                             - vlan
                             type: string
                           bridgeDomainName:
-                            description: BridgeDomainName defines the name of the bridgeDomain
+                            description: BridgeDomainName defines the name of the bridgeDomain belonging to the interface
                             type: string
                           interfaceName:
                             description: InterfaceName defines the name of the interface
                             type: string
                           kind:
                             default: interface
+                            description: Kind defines the kind of interface. Attached to a routing table both interface and bridgedomain interfaces are allowed. In a BridgeDomain only regular interfaces are allowed
                             enum:
                             - interface
                             - bridgedomain
                             type: string
                           nodeName:
-                            description: NodeName defines the name of the node the interface belongs to
+                            description: NodeName defines the name of the node the interface belongs to interface
                             type: string
                           selector:
                             description: Selector defines the selector criterias for the interface selection
@@ -168,8 +175,10 @@ spec:
                         type: object
                       type: array
                     name:
+                      description: Name defines the name of the routing table
                       type: string
                     prefixes:
+                      description: Prefixes defines the prefixes belonging to the routing table
                       items:
                         properties:
                           labels:
@@ -191,6 +200,7 @@ spec:
                   type: object
                 type: array
               topology:
+                description: Topology defines the topology to which this network applies
                 type: string
             required:
             - topology

@@ -46,6 +46,26 @@ rules:
   - patch
   - update
 - apiGroups:
+  - inv.nephio.org
+  resources:
+  - targets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inv.nephio.org
+  resources:
+  - targets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - ipam.alloc.nephio.org
   resources:
   - ipprefixes

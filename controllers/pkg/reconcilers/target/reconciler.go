@@ -71,7 +71,7 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[sche
 	r.targets = cfg.Targets
 
 	return nil, ctrl.NewControllerManagedBy(mgr).
-		Named("NetworkController").
+		Named("TargetController").
 		For(&invv1alpha1.Target{}).
 		Complete(r)
 }
@@ -149,7 +149,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		api.Username(string(secret.Data["username"])),
 		api.Password(string(secret.Data["password"])),
 	)
-	fmt.Println(tg)
 	err = tg.CreateGNMIClient(ctx)
 	if err != nil {
 		r.l.Error(err, "cannot create client")

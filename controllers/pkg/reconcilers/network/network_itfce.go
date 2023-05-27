@@ -267,6 +267,7 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			}
 
 			prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
+			prefixName = strings.ReplaceAll(prefixName, ":", "-")
 			_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 				metav1.ObjectMeta{
 					Name:      prefixName,
