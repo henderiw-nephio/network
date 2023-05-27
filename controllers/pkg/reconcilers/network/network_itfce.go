@@ -143,9 +143,10 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 		}
 
 		// allocate link prefix
+		prefixName := fmt.Sprintf("%s-%s", ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()), LinkName)
 		_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 			metav1.ObjectMeta{
-				Name:      LinkName,
+				Name:      prefixName,
 				Namespace: r.Namespace,
 			},
 			ipamv1alpha1.IPAllocationSpec{
@@ -170,7 +171,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 		}
 
 		addressSelectorLabels := map[string]string{
-			allocv1alpha1.NephioOwnerNsnNameKey:      LinkName,
+			allocv1alpha1.NephioOwnerNsnNameKey:      prefixName,
 			allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
 		}
 
