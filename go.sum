@@ -749,8 +749,8 @@ github.com/nephio-project/api v0.0.0-20230522173958-63a41669b495/go.mod h1:v2DHa
 github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230523155359-0d37fc7f7a8d h1:f2yi53eaP50aM2lxWFVKZQpN/IT400UVFW/XXnZE6lM=
 github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230523155359-0d37fc7f7a8d/go.mod h1:nCrE3Ab5jsC5UJuPq/EntZdwLw3GaNjjoKRS3UzNMqE=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
-github.com/nokia/k8s-ipam v0.0.4-0.20230526170941-1c93caca3cc3 h1:BGlLtMvrZs4SCE5WWMr/enMX07PE0CwgRJTMDLLYYWw=
-github.com/nokia/k8s-ipam v0.0.4-0.20230526170941-1c93caca3cc3/go.mod h1:OKpWLX46crCZ4fJAfo14lXSQ1RXHhft8NmFzt71IKUw=
+github.com/nokia/k8s-ipam v0.0.4-0.20230527063457-05bda81596a5 h1:BoLlcN4eV01M75ar73wn9ohFgWechuJCXJeEYsScDkM=
+github.com/nokia/k8s-ipam v0.0.4-0.20230527063457-05bda81596a5/go.mod h1:OKpWLX46crCZ4fJAfo14lXSQ1RXHhft8NmFzt71IKUw=
 github.com/oklog/run v1.0.0/go.mod h1:dlhp/R75TPv97u0XWUtDeV/lRKWPKSdTuV0TZvrmrQA=
 github.com/oklog/run v1.1.0 h1:GEenZ1cK0+q0+wsJew9qUg/DyD8k3JzYsZAi5gYi2mA=
 github.com/oklog/run v1.1.0/go.mod h1:sVPdnTZT1zYwAJeCMu2Th4T21pA3FPOQRfWjQlk7DVU=
