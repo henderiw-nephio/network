@@ -128,6 +128,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			cr.SetConditions(allocv1alpha1.Failed(err.Error()))
 			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 		}
+		// TBD How de we handle secret unaviabalility
 		cr.SetConditions(allocv1alpha1.Failed("cannot connect to target, secret not available"))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 
@@ -142,7 +143,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		api.Address(*cr.Spec.Address),
 		api.SkipVerify(true),
 		api.Username(string(secret.Data["username"])),
-		api.Username(string(secret.Data["password"])),
+		api.Password(string(secret.Data["password"])),
 	)
 	err = tg.CreateGNMIClient(ctx)
 	if err != nil {
