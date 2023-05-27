@@ -98,6 +98,11 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
+	if cr.Labels[invv1alpha1.NephioProviderKey] != nokiaSRLProvider {
+		// this is a target that is not acted upon by this contoller
+		return ctrl.Result{}, nil
+	}
+
 	if resource.WasDeleted(cr) {
 		if tg := r.targets.Get(req.NamespacedName); tg != nil {
 			if err := tg.Close(); err != nil {
@@ -128,10 +133,9 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			cr.SetConditions(allocv1alpha1.Failed(err.Error()))
 			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 		}
-		// TBD How de we handle secret unaviabalility
+		// TBD How de we handle secret unaviabalility -> do we watch secrets?
 		cr.SetConditions(allocv1alpha1.Failed("cannot connect to target, secret not available"))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-
 	}
 
 	if cr.Spec.Address == nil {
@@ -145,6 +149,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		api.Username(string(secret.Data["username"])),
 		api.Password(string(secret.Data["password"])),
 	)
+	fmt.Println(tg)
 	err = tg.CreateGNMIClient(ctx)
 	if err != nil {
 		r.l.Error(err, "cannot create client")
