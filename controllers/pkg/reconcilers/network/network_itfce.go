@@ -137,14 +137,9 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 		af := pi.GetAddressFamily()
 
 		// add the prefix labels to the prefix selector labels
-		prefixSelectorLabels := map[string]string{}
-		for k, v := range prefix.Labels {
-			if k != allocv1alpha1.NephioPrefixKindKey {
-				prefixSelectorLabels[k] = v
-			}
-		}
-		for k, v := range prefixSelectorLabels {
-			labels[k] = v
+		prefixSelectorLabels := map[string]string{
+			allocv1alpha1.NephioOwnerNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
+			allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
 		}
 
 		// allocate link prefix
@@ -173,6 +168,12 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 		if err != nil {
 			return err
 		}
+
+		addressSelectorLabels := map[string]string{
+			allocv1alpha1.NephioOwnerNsnNameKey:      LinkName,
+			allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
+		}
+
 		prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 			metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-%s", LinkName, nodeName),
@@ -189,7 +190,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 						},
 					},
 					Selector: &metav1.LabelSelector{
-						MatchLabels: labels,
+						MatchLabels: addressSelectorLabels,
 					},
 				},
 			},
@@ -255,15 +256,9 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			af := pi.GetAddressFamily()
 
 			// add the prefix labels to the prefix selector labels
-			prefixSelectorLabels := map[string]string{}
-			for k, v := range prefix.Labels {
-				if k != allocv1alpha1.NephioPrefixKindKey {
-					prefixSelectorLabels[k] = v
-				}
-			}
-
-			for k, v := range prefixSelectorLabels {
-				labels[k] = v
+			prefixSelectorLabels := map[string]string{
+				allocv1alpha1.NephioOwnerNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
+				allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
 			}
 
 			prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
@@ -296,6 +291,10 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			// for network based prefixes i will allocate a gateway IP
 			if prefixKind == ipamv1alpha1.PrefixKindNetwork {
 				// add the selector labels to the labels to ensure we pick the right prefix
+				addressSelectorLabels := map[string]string{
+					allocv1alpha1.NephioOwnerNsnNameKey:      prefixName,
+					allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
+				}
 
 				prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 					metav1.ObjectMeta{
@@ -313,7 +312,7 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 								},
 							},
 							Selector: &metav1.LabelSelector{
-								MatchLabels: labels,
+								MatchLabels: addressSelectorLabels,
 							},
 						},
 					},
