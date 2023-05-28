@@ -31,6 +31,7 @@ import (
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/openconfig/gnmi/proto/gnmi"
 	"github.com/openconfig/gnmic/api"
+	"github.com/openconfig/gnmic/utils"
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"
 	"google.golang.org/protobuf/encoding/prototext"
@@ -218,6 +219,10 @@ func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) err
 			r.l.Info("update", "data", u)
 			dps = append(dps, u.GetPath())
 		}
+	}
+
+	for _, p := range dps {
+		fmt.Println("delete path: ", utils.GnmiPathToXPath(p, false))
 	}
 
 	nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
