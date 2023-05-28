@@ -155,6 +155,7 @@ func (r *reconciler) Update(ctx context.Context, cr *configv1alpha1.Network) err
 	fmt.Println(string(cr.Spec.Config.Raw))
 	goStruct, err := r.m.NewConfigStruct(cr.Spec.Config.Raw, true)
 	if err != nil {
+		r.l.Error(err, "cannot get goStruct")
 		return err
 	}
 
@@ -177,10 +178,12 @@ func (r *reconciler) Update(ctx context.Context, cr *configv1alpha1.Network) err
 			api.Value(j, "json_ietf"),
 		))
 	if err != nil {
+		r.l.Error(err, "cannot create SetRequest")
 		return err
 	}
 	setResp, err := tg.Set(ctx, setReq)
 	if err != nil {
+		r.l.Error(err, "cannot set config")
 		return err
 	}
 	r.l.Info("update", "resp", prototext.Format(setResp))
