@@ -35,7 +35,8 @@ import (
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
-	"github.com/nokia/k8s-ipam/pkg/resource"
+	//"github.com/nokia/k8s-ipam/pkg/resource"
+	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	"github.com/openconfig/ygot/ygot"
 
 	"github.com/pkg/errors"

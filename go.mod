@@ -6,6 +6,8 @@ replace k8s.io/api => k8s.io/api v0.26.1
 
 replace k8s.io/client-go => k8s.io/client-go v0.26.1
 
+replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.14.6
+
 require (
 	github.com/go-logr/logr v1.2.4
 	github.com/henderiw-nephio/nephio-controllers v0.0.0-20230527070950-54df26c51595
