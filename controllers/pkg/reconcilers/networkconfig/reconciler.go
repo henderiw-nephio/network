@@ -29,6 +29,7 @@ import (
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/meta"
+	"github.com/openconfig/gnmi/proto/gnmi"
 	"github.com/openconfig/gnmic/api"
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"
@@ -211,37 +212,28 @@ func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) err
 		return nil
 	}
 
+	dps := []*gnmi.Path{}
 	for _, n := range notifications {
 		for _, u := range n.GetUpdate() {
 			r.l.Info("update", "data", u)
-		}
-		for _, d := range n.GetDelete() {
-			r.l.Info("update", "data", d)
+			dps = append(dps, u.GetPath())
 		}
 	}
 
-	/*
-		nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
-		tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
-		if tg == nil {
-			return fmt.Errorf("no target client available")
-		}
-		setReq, err := api.NewSetRequest(
-			api.Delete(
-				api.Path("/"),
-				api.Value(cr.Status.LastAppliedConfig, "json_ietf"),
-			))
-		if err != nil {
-			return err
-		}
-		setResp, err := tg.Set(ctx, setReq)
-		if err != nil {
-			return err
-		}
-		r.l.Info("update", "resp", prototext.Format(setResp))
+	nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
+	tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
+	if tg == nil {
+		return fmt.Errorf("no target client available")
+	}
 
-		cr.Status.LastAppliedConfig = cr.Spec.Config
-	*/
+	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: dps})
+	if err != nil {
+		return err
+	}
+	r.l.Info("update", "resp", prototext.Format(setResp))
+
+	cr.Status.LastAppliedConfig.Raw = nil
+
 	return nil
 
 }
