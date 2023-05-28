@@ -21,17 +21,15 @@ import (
 	"fmt"
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	"github.com/henderiw-nephio/network/pkg/resources"
 	"github.com/henderiw-nephio/network/pkg/targets"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
-	"github.com/nephio-project/nephio/controllers/pkg/resource"
-
-	//ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
-
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
+	"github.com/nokia/k8s-ipam/pkg/resource"
 	"github.com/srl-labs/ygotsrl/v22"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,11 +38,11 @@ import (
 )
 
 type network struct {
-	*infrav1alpha1.Network
 	resource.APIPatchingApplicator
-	apply           bool
-	devices         map[string]*ygotsrl.Device
-	resources       map[corev1.ObjectReference]client.Object
+	apply     bool
+	devices   map[string]*ygotsrl.Device
+	resources resources.Resources
+	//resources       map[corev1.ObjectReference]client.Object
 	eps             *endpoints
 	hash            hash.HashTable
 	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
@@ -52,39 +50,46 @@ type network struct {
 	targets         targets.Target
 }
 
-func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable) client.Object {
+func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable, cr *infrav1alpha1.Network) client.Object {
 	// create IPAM NetworkInstance
 	o := ipamv1alpha1.BuildNetworkInstance(
 		metav1.ObjectMeta{
 			Name:            fmt.Sprintf("%s-rt", rt.Name),
-			Namespace:       r.Namespace,
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: r.APIVersion, Kind: r.Kind, Name: r.Name, UID: r.UID, Controller: pointer.Bool(true)}},
+			Namespace:       cr.Namespace,
+			Labels:          getMatchingLabels(cr),
+			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
 		}, ipamv1alpha1.NetworkInstanceSpec{
 			Prefixes: rt.Prefixes,
 		}, ipamv1alpha1.NetworkInstanceStatus{})
-	r.resources[corev1.ObjectReference{APIVersion: o.GetResourceVersion(), Kind: o.GetObjectKind().GroupVersionKind().Kind, Name: o.GetName(), Namespace: o.GetNamespace()}] = o
+	r.resources.AddNewResource(
+		corev1.ObjectReference{APIVersion: o.GetResourceVersion(), Kind: o.GetObjectKind().GroupVersionKind().Kind, Name: o.GetName(), Namespace: o.GetNamespace()},
+		o,
+	)
 	return o
 }
 
-func (r *network) populateVlanDatabase(selectorName string) client.Object {
+func (r *network) populateVlanDatabase(selectorName string, cr *infrav1alpha1.Network) client.Object {
 	// create VLAN DataBase
 	o := vlanv1alpha1.BuildVLANDatabase(
 		metav1.ObjectMeta{
 			Name:            selectorName, // the vlan db is always the selectorName since the bd is physical and not virtual
-			Namespace:       r.Namespace,
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: r.APIVersion, Kind: r.Kind, Name: r.Name, UID: r.UID, Controller: pointer.Bool(true)}},
+			Namespace:       cr.Namespace,
+			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
 		},
 		vlanv1alpha1.VLANDatabaseSpec{
 			Kind: vlanv1alpha1.VLANDBKindESG,
 		},
 		vlanv1alpha1.VLANDatabaseStatus{},
 	)
-	r.resources[corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace}] = o
+	r.resources.AddNewResource(
+		corev1.ObjectReference{APIVersion: o.GetResourceVersion(), Kind: o.GetObjectKind().GroupVersionKind().Kind, Name: o.GetName(), Namespace: o.GetNamespace()},
+		o,
+	)
 	return o
 }
 
-func (r *network) PopulateBridgeDomains(ctx context.Context) error {
-	for _, bd := range r.Spec.BridgeDomains {
+func (r *network) PopulateBridgeDomains(ctx context.Context, cr *infrav1alpha1.Network) error {
+	for _, bd := range cr.Spec.BridgeDomains {
 		// tracker tracks if we already initialized the context
 		// it ensure we dont duplicate allocations, etc etc
 		tr := NewTracker()
@@ -104,7 +109,7 @@ func (r *network) PopulateBridgeDomains(ctx context.Context) error {
 
 						// create a VLANDatabase (based on selectorName)
 						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-							o := r.populateVlanDatabase(selectorName)
+							o := r.populateVlanDatabase(selectorName, cr)
 							if r.apply {
 								if err := r.Apply(ctx, o); err != nil {
 									return err
@@ -121,7 +126,7 @@ func (r *network) PopulateBridgeDomains(ctx context.Context) error {
 						// create bridgedomain (bdname) + create a bd index
 						r.PopulateBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
 						// create interface/subinterface + networkInstance interface
-						if err := r.PopulateBridgeInterface(ctx, selectorName, bdName, ep, itfce.AttachmentType); err != nil {
+						if err := r.PopulateBridgeInterface(ctx, cr, selectorName, bdName, ep, itfce.AttachmentType); err != nil {
 							return err
 						}
 					}
@@ -148,9 +153,9 @@ func getSelector(itfce infrav1alpha1.Interface) *metav1.LabelSelector {
 	return selector
 }
 
-func (r *network) PopulateRoutingTables(ctx context.Context) error {
-	for _, rt := range r.Spec.RoutingTables {
-		o := r.populateIPAMNetworkInstance(rt)
+func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.Network) error {
+	for _, rt := range cr.Spec.RoutingTables {
+		o := r.populateIPAMNetworkInstance(rt, cr)
 		if r.apply {
 			if err := r.Apply(ctx, o); err != nil {
 				return err
@@ -160,7 +165,7 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 		for _, itfce := range rt.Interfaces {
 			if itfce.Kind == infrav1alpha1.InterfaceKindBridgeDomain {
 				// create IRB + we lookup the interfaces/selectors in the bridge domain
-				for _, bd := range r.Spec.BridgeDomains {
+				for _, bd := range cr.Spec.BridgeDomains {
 					if itfce.BridgeDomainName != nil && bd.Name == *itfce.BridgeDomainName {
 						if r.apply {
 							continue
@@ -182,11 +187,11 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 											bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
 										}
 										// populate the bridge part
-										if err := r.PopulateIRBInterface(ctx, false, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
+										if err := r.PopulateIRBInterface(ctx, cr, false, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
 											return err
 										}
 										// populate the routed part
-										if err := r.PopulateIRBInterface(ctx, true, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
+										if err := r.PopulateIRBInterface(ctx, cr, true, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
 											return err
 										}
 									}
@@ -213,7 +218,7 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 						rtName := fmt.Sprintf("%s-rt", rt.Name)
 
 						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-							o := r.populateVlanDatabase(selectorName)
+							o := r.populateVlanDatabase(selectorName, cr)
 							if r.apply {
 								if err := r.Apply(ctx, o); err != nil {
 									return err
@@ -230,7 +235,7 @@ func (r *network) PopulateRoutingTables(ctx context.Context) error {
 
 						r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
 						// create interface/subinterface + networkInstance interface +
-						if err := r.PopulateRoutedInterface(ctx, selectorName, rtName, ep, itfce.AttachmentType, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
+						if err := r.PopulateRoutedInterface(ctx, cr, selectorName, rtName, ep, itfce.AttachmentType, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
 							return err
 						}
 					}

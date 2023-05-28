@@ -55,7 +55,7 @@ const (
 //+kubebuilder:rbac:groups=inv.nephio.org,resources=targets/status,verbs=get;update;patch
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *reconciler) SetupWithManager(mgr ctrl.Manager, c interface{}) (map[schema.GroupVersionKind]chan event.GenericEvent, error) {
+func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c interface{}) (map[schema.GroupVersionKind]chan event.GenericEvent, error) {
 
 	cfg, ok := c.(*ctrlrconfig.ControllerConfig)
 	if !ok {

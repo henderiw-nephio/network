@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
@@ -39,7 +40,7 @@ import (
 
 const irbInterfaceName = "irb0"
 
-func (r *network) PopulateBridgeInterface(ctx context.Context, selectorName, bdName string, ep invv1alpha1.Endpoint, attachmentType reqv1alpha1.AttachmentType) error {
+func (r *network) PopulateBridgeInterface(ctx context.Context, cr *infrav1alpha1.Network, selectorName, bdName string, ep invv1alpha1.Endpoint, attachmentType reqv1alpha1.AttachmentType) error {
 	nodeName := ep.Spec.NodeName
 	if _, ok := r.devices[nodeName]; !ok {
 		r.devices[nodeName] = new(ygotsrl.Device)
@@ -50,10 +51,10 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, selectorName, bdN
 		vlanAlloc, err := r.VlanClientProxy.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
 			metav1.ObjectMeta{
 				Name:      bdName,
-				Namespace: r.Namespace,
+				Namespace: cr.Namespace,
 			},
 			vlanv1alpha1.VLANAllocationSpec{
-				VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: r.Namespace},
+				VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: cr.Namespace},
 			},
 			vlanv1alpha1.VLANAllocationStatus{},
 		), nil)
@@ -84,7 +85,7 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, selectorName, bdN
 	return nil
 }
 
-func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtName string, ep invv1alpha1.Endpoint, attachmentType reqv1alpha1.AttachmentType, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
+func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1.Network, selectorName, rtName string, ep invv1alpha1.Endpoint, attachmentType reqv1alpha1.AttachmentType, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
 	nodeName := ep.Spec.NodeName
 	if _, ok := r.devices[nodeName]; !ok {
 		r.devices[nodeName] = new(ygotsrl.Device)
@@ -95,10 +96,10 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 		vlanAlloc, err := r.VlanClientProxy.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
 			metav1.ObjectMeta{
 				Name:      rtName,
-				Namespace: r.Namespace,
+				Namespace: cr.Namespace,
 			},
 			vlanv1alpha1.VLANAllocationSpec{
-				VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: r.Namespace},
+				VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: cr.Namespace},
 			},
 			vlanv1alpha1.VLANAllocationStatus{},
 		), nil)
@@ -139,7 +140,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 		// add the prefix labels to the prefix selector labels
 		prefixSelectorLabels := map[string]string{
 			allocv1alpha1.NephioOwnerNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
-			allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
+			allocv1alpha1.NephioOwnerNsnNamespaceKey: cr.Namespace,
 		}
 
 		// allocate link prefix
@@ -147,11 +148,11 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 		_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 			metav1.ObjectMeta{
 				Name:      prefixName,
-				Namespace: r.Namespace,
+				Namespace: cr.Namespace,
 			},
 			ipamv1alpha1.IPAllocationSpec{
 				Kind:            ipamv1alpha1.PrefixKindNetwork,
-				NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: r.Namespace},
+				NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
 				AddressFamily:   &af,
 				PrefixLength:    util.PointerUint8(prefixLength),
 				CreatePrefix:    pointer.Bool(true),
@@ -172,17 +173,17 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 
 		addressSelectorLabels := map[string]string{
 			allocv1alpha1.NephioOwnerNsnNameKey:      prefixName,
-			allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
+			allocv1alpha1.NephioOwnerNsnNamespaceKey: cr.Namespace,
 		}
 
 		prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 			metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-%s", LinkName, nodeName),
-				Namespace: r.Namespace,
+				Namespace: cr.Namespace,
 			},
 			ipamv1alpha1.IPAllocationSpec{
 				Kind:            ipamv1alpha1.PrefixKindNetwork,
-				NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: r.Namespace},
+				NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
 				AddressFamily:   &af,
 				AllocationLabels: allocv1alpha1.AllocationLabels{
 					UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
@@ -222,7 +223,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, selectorName, rtN
 	return nil
 }
 
-func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName, rtName string, ep invv1alpha1.Endpoint, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
+func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Network, routed bool, bdName, rtName string, ep invv1alpha1.Endpoint, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
 	nodeName := ep.Spec.NodeName
 	if _, ok := r.devices[nodeName]; !ok {
 		r.devices[nodeName] = new(ygotsrl.Device)
@@ -259,7 +260,7 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			// add the prefix labels to the prefix selector labels
 			prefixSelectorLabels := map[string]string{
 				allocv1alpha1.NephioOwnerNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
-				allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
+				allocv1alpha1.NephioOwnerNsnNamespaceKey: cr.Namespace,
 			}
 
 			prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
@@ -267,11 +268,11 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 			_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 				metav1.ObjectMeta{
 					Name:      prefixName,
-					Namespace: r.Namespace,
+					Namespace: cr.Namespace,
 				},
 				ipamv1alpha1.IPAllocationSpec{
 					Kind:            prefixKind,
-					NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: r.Namespace},
+					NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
 					AddressFamily:   &af,
 					PrefixLength:    util.PointerUint8(prefixLength),
 					CreatePrefix:    pointer.Bool(true),
@@ -294,17 +295,17 @@ func (r *network) PopulateIRBInterface(ctx context.Context, routed bool, bdName,
 				// add the selector labels to the labels to ensure we pick the right prefix
 				addressSelectorLabels := map[string]string{
 					allocv1alpha1.NephioOwnerNsnNameKey:      prefixName,
-					allocv1alpha1.NephioOwnerNsnNamespaceKey: r.Namespace,
+					allocv1alpha1.NephioOwnerNsnNamespaceKey: cr.Namespace,
 				}
 
 				prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 					metav1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-gateway", prefixName),
-						Namespace: r.Namespace,
+						Namespace: cr.Namespace,
 					},
 					ipamv1alpha1.IPAllocationSpec{
 						Kind:            prefixKind,
-						NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: r.Namespace},
+						NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
 						AddressFamily:   &af,
 						AllocationLabels: allocv1alpha1.AllocationLabels{
 							UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
