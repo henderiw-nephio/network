@@ -45,17 +45,17 @@ func getKeys(s *metav1.LabelSelector) []string {
 
 
 
-func (self *endpoints) iterator() *iterator[invv1alpha1.Endpoint] {
-	return &iterator[invv1alpha1.Endpoint]{curIdx: -1, items: self.Items}
+func (r *endpoints) iterator() *iterator[invv1alpha1.Endpoint] {
+	return &iterator[invv1alpha1.Endpoint]{curIdx: -1, items: r.Items}
 }
 
 // GetUniqueKeyValues returns unique values based on the selector keys
 // e.g. used to return the unique clusters endpoints if the selector is about clusters
-func (self *endpoints) GetUniqueKeyValues(selector labels.Selector, keys []string) []string {
+func (r *endpoints) GetUniqueKeyValues(selector labels.Selector, keys []string) []string {
 	values := []string{}
 	lvalues := map[string]struct{}{}
 
-	iter := self.iterator()
+	iter := r.iterator()
 	for iter.HasNext() {
 		if selector.Matches(labels.Set(iter.Value().Labels)) {
 			selectorName := getKeyValueName(labels.Set(iter.Value().Labels), keys)
@@ -83,11 +83,11 @@ func getKeyValueName(labels map[string]string, keys []string) string {
 	return sb.String()
 }
 
-func (self *endpoints) GetNodes(selector labels.Selector) []string {
+func (r *endpoints) GetNodes(selector labels.Selector) []string {
 	values := []string{}
 	lvalues := map[string]struct{}{}
 
-	iter := self.iterator()
+	iter := r.iterator()
 	for iter.HasNext() {
 		if selector.Matches(labels.Set(iter.Value().Labels)) {
 			if _, ok := lvalues[iter.Value().Spec.NodeName]; !ok {
@@ -99,7 +99,7 @@ func (self *endpoints) GetNodes(selector labels.Selector) []string {
 	return values
 }
 
-func (self *endpoints) GetEndpointsPerSelector(s *metav1.LabelSelector) (map[string][]invv1alpha1.Endpoint, error) {
+func (r *endpoints) GetEndpointsPerSelector(s *metav1.LabelSelector) (map[string][]invv1alpha1.Endpoint, error) {
 	selector, err := metav1.LabelSelectorAsSelector(s)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func (self *endpoints) GetEndpointsPerSelector(s *metav1.LabelSelector) (map[str
 	keys := getKeys(s)
 	epPerSelector := map[string][]invv1alpha1.Endpoint{}
 
-	iter := self.iterator()
+	iter := r.iterator()
 	for iter.HasNext() {
 		if selector.Matches(labels.Set(iter.Value().Labels)) {
 			selectorName := getKeyValueName(labels.Set(iter.Value().Labels), keys)

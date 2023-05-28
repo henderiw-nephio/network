@@ -173,12 +173,6 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	if err := r.applyInitialresources(ctx, cr, eps); err != nil {
-		r.l.Error(err, "cannot apply initial resources")
-		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
-		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
-	}
-
 	r.resources = resources.New(
 		r.APIPatchingApplicator,
 		resources.Config{
@@ -187,6 +181,12 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			Owns:           []schema.GroupVersionKind{},
 		},
 	)
+
+	if err := r.applyInitialresources(ctx, cr, eps); err != nil {
+		r.l.Error(err, "cannot apply initial resources")
+		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
+		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
 
 	if err := r.getNewResources(ctx, cr, eps); err != nil {
 		r.l.Error(err, "cannot get new resources")

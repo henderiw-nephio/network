@@ -55,7 +55,7 @@ func (r *network) PopulateBridgeDomain(ctx context.Context, nodeName, selectorNa
 			ExportRt: ygot.String(strings.Join([]string{"target", "65555", strconv.Itoa(int(bdIndex))}, ":")),
 		}
 	*/
-	return
+	//return
 }
 
 func (r *network) PopulateRoutingInstance(ctx context.Context, nodeName, selectorName, rtName string) {
@@ -85,5 +85,5 @@ func (r *network) PopulateRoutingInstance(ctx context.Context, nodeName, selecto
 			ExportRt: ygot.String(strings.Join([]string{"target", "65555", strconv.Itoa(int(rtIndex))}, ":")),
 		}
 	*/
-	return
+	//return
 }

@@ -22,13 +22,13 @@ import (
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/resources"
-	"github.com/henderiw-nephio/network/pkg/targets"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
+
 	//"github.com/nokia/k8s-ipam/pkg/resource"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	"github.com/srl-labs/ygotsrl/v22"
@@ -48,7 +48,7 @@ type network struct {
 	hash            hash.HashTable
 	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
 	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]
-	targets         targets.Target
+	//targets         targets.Target
 }
 
 func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable, cr *infrav1alpha1.Network) client.Object {
