@@ -193,6 +193,33 @@ func (r *reconciler) Update(ctx context.Context, cr *configv1alpha1.Network) err
 }
 
 func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) error {
+
+	if len(cr.Status.LastAppliedConfig.Raw) == 0 {
+		// no config applied tot he device
+		return nil
+	}
+
+	goStruct, err := r.m.NewConfigStruct(cr.Spec.Config.Raw, true)
+	if err != nil {
+		r.l.Error(err, "cannot get goStruct")
+		return err
+	}
+
+	notifications, err := ygot.TogNMINotifications(goStruct, 0, ygot.GNMINotificationsConfig{UsePathElem: true})
+	if err != nil {
+		r.l.Error(err, "cannot get notifications")
+		return nil
+	}
+
+	for _, n := range notifications {
+		for _, u := range n.GetUpdate() {
+			r.l.Info("update", "data", u)
+		}
+		for _, d := range n.GetDelete() {
+			r.l.Info("update", "data", d)
+		}
+	}
+
 	/*
 		nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
 		tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
