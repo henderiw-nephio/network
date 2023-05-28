@@ -112,9 +112,9 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("NetworkController").
 		For(&infrav1alpha1.Network{}).
-		Owns(&ipamv1alpha1.NetworkInstance{}).
-		Owns(&vlanv1alpha1.VLANDatabase{}).
-		Owns(&configv1alpha1.Network{}).
+		//Owns(&ipamv1alpha1.NetworkInstance{}).
+		//Owns(&vlanv1alpha1.VLANDatabase{}).
+		//Owns(&configv1alpha1.Network{}).
 		Complete(r)
 }
 

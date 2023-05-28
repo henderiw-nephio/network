@@ -59,13 +59,13 @@ type resources struct {
 
 func (r *resources) AddNewResource(ref corev1.ObjectReference, o client.Object) {
 	r.m.Lock()
-	defer r.m.Lock()
+	defer r.m.Unlock()
 	r.newResources[ref] = o
 }
 
 func (r *resources) GetExistingResources(ctx context.Context) error {
 	r.m.Lock()
-	defer r.m.Lock()
+	defer r.m.Unlock()
 
 	for _, gvk := range r.cfg.Owns {
 		objs := meta.GetUnstructuredListFromGVK(&gvk)
@@ -94,7 +94,7 @@ func (r *resources) GetExistingResources(ctx context.Context) error {
 // step 3. apply the new resources to the api server
 func (r *resources) APIApply(ctx context.Context) error {
 	r.m.Lock()
-	defer r.m.Lock()
+	defer r.m.Unlock()
 
 	for ref := range r.newResources {
 		delete(r.existingResources, ref)
