@@ -35,6 +35,7 @@ import (
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
+
 	//"github.com/nokia/k8s-ipam/pkg/resource"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	"github.com/openconfig/ygot/ygot"
@@ -75,8 +76,6 @@ const (
 //+kubebuilder:rbac:groups=config.alloc.nephio.org,resources=networks/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=inv.nephio.org,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=inv.nephio.org,resources=endpoints/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=inv.nephio.org,resources=targets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=inv.nephio.org,resources=targets/status,verbs=get;update;patch
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c interface{}) (map[schema.GroupVersionKind]chan event.GenericEvent, error) {
@@ -112,9 +111,9 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("NetworkController").
 		For(&infrav1alpha1.Network{}).
-		//Owns(&ipamv1alpha1.NetworkInstance{}).
-		//Owns(&vlanv1alpha1.VLANDatabase{}).
-		//Owns(&configv1alpha1.Network{}).
+		Owns(&ipamv1alpha1.NetworkInstance{}).
+		Owns(&vlanv1alpha1.VLANDatabase{}).
+		Owns(&configv1alpha1.Network{}).
 		Complete(r)
 }
 
@@ -214,6 +213,12 @@ func getMatchingLabels(cr client.Object) client.MatchingLabels {
 	}
 }
 
+func getMatchingNodeLabels(cr client.Object, nodeName string) client.MatchingLabels {
+	labels := getMatchingLabels(cr)
+	labels[invv1alpha1.NephioNodeNameKey] = nodeName
+	return labels
+}
+
 func (r *reconciler) getProviderEndpoints(ctx context.Context, topology string) (*endpoints, error) {
 	opts := []client.ListOption{
 		client.MatchingLabels{
@@ -299,12 +304,11 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			return err
 		}
 		fmt.Println(jsonString)
-
 		newNetwNodeConfig := configv1alpha1.BuildNetworkConfig(
 			metav1.ObjectMeta{
 				Name:            fmt.Sprintf("%s-%s", cr.Name, nodeName),
 				Namespace:       cr.Namespace,
-				Labels:          getMatchingLabels(cr),
+				Labels:          getMatchingNodeLabels(cr, nodeName),
 				OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
 			}, configv1alpha1.NetworkSpec{
 				Config: runtime.RawExtension{
