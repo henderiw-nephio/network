@@ -24,11 +24,14 @@ import (
 	"github.com/go-logr/logr"
 	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
+	"github.com/henderiw-nephio/network/pkg/model"
 	"github.com/henderiw-nephio/network/pkg/targets"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/openconfig/gnmic/api"
+	"github.com/openconfig/ygot/ygot"
+	"github.com/srl-labs/ygotsrl/v22"
 	"google.golang.org/protobuf/encoding/prototext"
 
 	//"github.com/nokia/k8s-ipam/pkg/resource"
@@ -73,6 +76,13 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 	r.finalizer = resource.NewAPIFinalizer(mgr.GetClient(), finalizer)
 	r.targets = cfg.Targets
 
+	r.m = &model.Model{
+		StructRootType:  reflect.TypeOf((*ygotsrl.Device)(nil)),
+		SchemaTreeRoot:  ygotsrl.SchemaTree["Device"],
+		JsonUnmarshaler: ygotsrl.Unmarshal,
+		EnumData:        ygotsrl.ΛEnum,
+	}
+
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("NetworkConfigController").
 		For(&configv1alpha1.Network{}).
@@ -85,6 +95,7 @@ type reconciler struct {
 
 	l       logr.Logger
 	targets targets.Target
+	m       *model.Model
 }
 
 func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -142,10 +153,28 @@ func (r *reconciler) Update(ctx context.Context, cr *configv1alpha1.Network) err
 		return fmt.Errorf("no target client available")
 	}
 	fmt.Println(string(cr.Spec.Config.Raw))
+	goStruct, err := r.m.NewConfigStruct(cr.Spec.Config.Raw, true)
+	if err != nil {
+		return err
+	}
+
+	j, err := ygot.EmitJSON(goStruct, &ygot.EmitJSONConfig{
+		Format: ygot.RFC7951,
+		Indent: "  ",
+		RFC7951Config: &ygot.RFC7951JSONConfig{
+			AppendModuleName: true,
+		},
+		SkipValidation: false,
+	})
+	if err != nil {
+		r.l.Error(err, "cannot construct json device info")
+		return err
+	}
+
 	setReq, err := api.NewSetRequest(
 		api.Update(
 			api.Path("/"),
-			api.Value(string(cr.Spec.Config.Raw), "json_ietf"),
+			api.Value(j, "json_ietf"),
 		))
 	if err != nil {
 		return err
