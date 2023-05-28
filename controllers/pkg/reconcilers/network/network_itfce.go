@@ -139,8 +139,8 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 
 		// add the prefix labels to the prefix selector labels
 		prefixSelectorLabels := map[string]string{
-			allocv1alpha1.NephioOwnerNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
-			allocv1alpha1.NephioOwnerNsnNamespaceKey: cr.Namespace,
+			allocv1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
+			allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
 		}
 
 		// allocate link prefix
@@ -172,8 +172,8 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 		}
 
 		addressSelectorLabels := map[string]string{
-			allocv1alpha1.NephioOwnerNsnNameKey:      prefixName,
-			allocv1alpha1.NephioOwnerNsnNamespaceKey: cr.Namespace,
+			allocv1alpha1.NephioNsnNameKey:      prefixName,
+			allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
 		}
 
 		prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
@@ -259,8 +259,8 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 
 			// add the prefix labels to the prefix selector labels
 			prefixSelectorLabels := map[string]string{
-				allocv1alpha1.NephioOwnerNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
-				allocv1alpha1.NephioOwnerNsnNamespaceKey: cr.Namespace,
+				allocv1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
+				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
 			}
 
 			prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
@@ -294,8 +294,8 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 			if prefixKind == ipamv1alpha1.PrefixKindNetwork {
 				// add the selector labels to the labels to ensure we pick the right prefix
 				addressSelectorLabels := map[string]string{
-					allocv1alpha1.NephioOwnerNsnNameKey:      prefixName,
-					allocv1alpha1.NephioOwnerNsnNamespaceKey: cr.Namespace,
+					allocv1alpha1.NephioNsnNameKey:           prefixName,
+					allocv1alpha1.NephioNsnNamespaceKey:      cr.Namespace,
 				}
 
 				prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
