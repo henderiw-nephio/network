@@ -18,7 +18,6 @@ package network
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -305,10 +304,6 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			return err
 		}
 
-		b, err := json.Marshal(j)
-		if err != nil {
-			return err
-		}
 		//fmt.Println(jsonString)
 		newNetwNodeConfig := configv1alpha1.BuildNetworkConfig(
 			metav1.ObjectMeta{
@@ -318,7 +313,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 				OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
 			}, configv1alpha1.NetworkSpec{
 				Config: runtime.RawExtension{
-					Raw: b,
+					Raw: []byte(j),
 				},
 			}, configv1alpha1.NetworkStatus{})
 		if existingNetwNodeConfig, ok := networkConfigs[fmt.Sprintf("%s-%s", cr.Name, nodeName)]; ok {
