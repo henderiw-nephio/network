@@ -141,10 +141,11 @@ func (r *reconciler) Update(ctx context.Context, cr *configv1alpha1.Network) err
 	if tg == nil {
 		return fmt.Errorf("no target client available")
 	}
+	fmt.Println(string(cr.Spec.Config.Raw))
 	setReq, err := api.NewSetRequest(
 		api.Update(
 			api.Path("/"),
-			api.Value(cr.Spec.Config.Raw, "json_ietf"),
+			api.Value(string(cr.Spec.Config.Raw), "json_ietf"),
 		))
 	if err != nil {
 		return err

@@ -303,7 +303,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			r.l.Error(err, "cannot construct json device info")
 			return err
 		}
-		fmt.Println(jsonString)
+		//fmt.Println(jsonString)
 		newNetwNodeConfig := configv1alpha1.BuildNetworkConfig(
 			metav1.ObjectMeta{
 				Name:            fmt.Sprintf("%s-%s", cr.Name, nodeName),
