@@ -182,18 +182,21 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		},
 	)
 
+	r.l.Info("apply initial resources")
 	if err := r.applyInitialresources(ctx, cr, eps); err != nil {
 		r.l.Error(err, "cannot apply initial resources")
 		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
+	r.l.Info("get new resources")
 	if err := r.getNewResources(ctx, cr, eps); err != nil {
 		r.l.Error(err, "cannot get new resources")
 		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
+	r.l.Info("apply all resources")
 	if err := r.resources.APIApply(ctx); err != nil {
 		r.l.Error(err, "cannot apply resources to the API")
 		cr.SetConditions(infrav1alpha1.Failed(err.Error()))
