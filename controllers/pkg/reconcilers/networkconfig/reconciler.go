@@ -25,6 +25,7 @@ import (
 	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/model"
+	"github.com/henderiw-nephio/network/pkg/rootpaths"
 	"github.com/henderiw-nephio/network/pkg/targets"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
@@ -213,17 +214,35 @@ func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) err
 		return nil
 	}
 
-	dps := []*gnmi.Path{}
+	rp := rootpaths.CreateRootConfigElement(r.m.SchemaTreeRoot)
+	// calculate the rootpaths for the deletion
 	for _, n := range notifications {
-		for _, u := range n.GetUpdate() {
-			r.l.Info("update", "data", u)
-			dps = append(dps, u.GetPath())
+		for _, dp := range n.GetUpdate() {
+			// lookup the schema entry for the via path defined node
+			pathAndSchema := rootpaths.GetPathAndSchemaEntry(r.m.SchemaTreeRoot, dp.Path)
+			rp.Add(pathAndSchema, dp.Val)
 		}
 	}
 
-	for _, p := range dps {
+	// collect the results of the rootpath calculation and performa a delete for
+	// all of these paths on the actual configuration
+	for _, p := range rp.GetRootPaths() {
 		fmt.Println("delete path: ", utils.GnmiPathToXPath(p, false))
 	}
+
+	/*
+		dps := []*gnmi.Path{}
+		for _, n := range notifications {
+			for _, u := range n.GetUpdate() {
+				r.l.Info("update", "data", u)
+				dps = append(dps, u.GetPath())
+			}
+		}
+
+		for _, p := range dps {
+			fmt.Println("delete path: ", utils.GnmiPathToXPath(p, false))
+		}
+	*/
 
 	nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
 	tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
@@ -231,7 +250,7 @@ func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) err
 		return fmt.Errorf("no target client available")
 	}
 
-	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: dps})
+	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: rp.GetRootPaths()})
 	if err != nil {
 		return err
 	}
