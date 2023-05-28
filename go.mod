@@ -13,7 +13,7 @@ require (
 	github.com/henderiw-nephio/nephio-controllers v0.0.0-20230527070950-54df26c51595
 	github.com/nephio-project/api v0.0.0-20230522173958-63a41669b495
 	github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230527153803-31b37fcf142b
-	github.com/nokia/k8s-ipam v0.0.4-0.20230528045816-3d40c108101b
+	github.com/nokia/k8s-ipam v0.0.4-0.20230527071833-c35a6a30c35d
 	github.com/openconfig/gnmi v0.9.1
 	github.com/openconfig/gnmic v0.31.0
 	github.com/openconfig/goyang v1.4.0
