@@ -24,7 +24,6 @@ import (
 	"github.com/go-logr/logr"
 	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/targets"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
@@ -76,7 +75,7 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("NetworkConfigController").
-		For(&infrav1alpha1.Network{}).
+		For(&configv1alpha1.Network{}).
 		Complete(r)
 }
 
