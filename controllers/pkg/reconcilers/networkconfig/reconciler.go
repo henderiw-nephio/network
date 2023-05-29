@@ -32,6 +32,7 @@ import (
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/openconfig/gnmi/proto/gnmi"
+	"github.com/openconfig/gnmic/utils"
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"
 	"google.golang.org/protobuf/encoding/prototext"
@@ -181,6 +182,14 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 	if err != nil {
 		r.l.Error(err, "cannot get notifications")
 		return nil
+	}
+
+	for _, d := range notification.GetDelete() {
+		fmt.Println("deletePath: ", utils.GnmiPathToXPath(d, false))
+	}
+	for _, u := range notification.GetUpdate() {
+		fmt.Println("updatePath: ", utils.GnmiPathToXPath(u.GetPath(), false))
+		fmt.Println("value: ", u.GetVal())
 	}
 
 	// delete the config from the device
