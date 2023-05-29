@@ -27,11 +27,11 @@ import (
 	"github.com/henderiw-nephio/network/pkg/model"
 	"github.com/henderiw-nephio/network/pkg/rootpaths"
 	"github.com/henderiw-nephio/network/pkg/targets"
+	commonv1alpha1 "github.com/nephio-project/api/common/v1alpha1"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/openconfig/gnmi/proto/gnmi"
-	"github.com/openconfig/gnmic/api"
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"
 	"google.golang.org/protobuf/encoding/prototext"
@@ -115,10 +115,12 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	if meta.WasDeleted(cr) {
-		if err := r.Delete(ctx, cr); err != nil {
-			r.l.Error(err, "cannot delete resource on target device")
-			cr.SetConditions(configv1alpha1.Failed(err.Error()))
-			return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+		if cr.Spec.Lifecycle.DeletionPolicy == commonv1alpha1.DeletionDelete {
+			if err := r.Delete(ctx, cr); err != nil {
+				r.l.Error(err, "cannot delete resource on target device")
+				cr.SetConditions(configv1alpha1.Failed(err.Error()))
+				return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+			}
 		}
 
 		if err := r.finalizer.RemoveFinalizer(ctx, cr); err != nil {
@@ -138,7 +140,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
-	if err := r.Update(ctx, cr); err != nil {
+	if err := r.Upsert(ctx, cr); err != nil {
 		r.l.Error(err, "cannot update resource")
 		cr.SetConditions(configv1alpha1.Failed(err.Error()))
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
@@ -148,72 +150,80 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 }
 
-func (r *reconciler) Update(ctx context.Context, cr *configv1alpha1.Network) error {
+func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) error {
 	nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
 	tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
 	if tg == nil {
 		return fmt.Errorf("no target client available")
 	}
-	fmt.Println(string(cr.Spec.Config.Raw))
-	goStruct, err := r.m.NewConfigStruct(cr.Spec.Config.Raw, true)
+
+	desiredGoStruct, err := r.m.NewConfigStruct(cr.Spec.Config.Raw, true)
 	if err != nil {
 		r.l.Error(err, "cannot get goStruct")
 		return err
 	}
 
-	j, err := ygot.EmitJSON(goStruct, &ygot.EmitJSONConfig{
-		Format: ygot.RFC7951,
-		Indent: "  ",
-		RFC7951Config: &ygot.RFC7951JSONConfig{
-			AppendModuleName: true,
-		},
-		SkipValidation: false,
-	})
+	appliedGoStruct, err := r.m.NewConfigStruct(nil, true)
 	if err != nil {
-		r.l.Error(err, "cannot construct json device info")
+		r.l.Error(err, "cannot get goStruct")
 		return err
+	}
+	if len(cr.Status.LastAppliedConfig.Raw) != 0 {
+		// create a new spec
+		appliedGoStruct, err = r.m.NewConfigStruct(cr.Status.LastAppliedConfig.Raw, true)
+		if err != nil {
+			r.l.Error(err, "cannot get goStruct")
+			return err
+		}
 	}
 
-	setReq, err := api.NewSetRequest(
-		api.Update(
-			api.Path("/"),
-			api.Value(j, "json_ietf"),
-		))
+	notification, err := ygot.Diff(appliedGoStruct, desiredGoStruct, &ygot.DiffPathOpt{})
 	if err != nil {
-		r.l.Error(err, "cannot create SetRequest")
-		return err
+		r.l.Error(err, "cannot get notifications")
+		return nil
 	}
-	setResp, err := tg.Set(ctx, setReq)
+
+	// delete the config from the device
+	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: notification.GetDelete(), Update: notification.GetUpdate()})
 	if err != nil {
-		r.l.Error(err, "cannot set config")
 		return err
 	}
 	r.l.Info("update", "resp", prototext.Format(setResp))
 
-	cr.Status.LastAppliedConfig = cr.Spec.Config
+	// set the last applied config to nil
+	cr.Status.LastAppliedConfig.Raw = cr.Spec.Config.Raw
 	return nil
 }
 
 func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) error {
-
+	// if there is no configutation applied to the device, there is no need to delete it
 	if len(cr.Status.LastAppliedConfig.Raw) == 0 {
 		// no config applied tot he device
 		return nil
 	}
 
-	goStruct, err := r.m.NewConfigStruct(cr.Spec.Config.Raw, true)
+	// find the target, if not target is available we cannot delete
+	nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
+	tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
+	if tg == nil {
+		return fmt.Errorf("no target client available")
+	}
+
+	// get go struct from the last applied config
+	goStruct, err := r.m.NewConfigStruct(cr.Status.LastAppliedConfig.Raw, true)
 	if err != nil {
 		r.l.Error(err, "cannot get goStruct")
 		return err
 	}
 
+	// get notifications from the go struct to calculate the delete paths
 	notifications, err := ygot.TogNMINotifications(goStruct, 0, ygot.GNMINotificationsConfig{UsePathElem: true})
 	if err != nil {
 		r.l.Error(err, "cannot get notifications")
 		return nil
 	}
 
-	// get the update paths
+	// get the update paths to calculate the delete paths
 	gnmiPaths := []*gnmi.Path{}
 	for _, n := range notifications {
 		for _, u := range n.GetUpdate() {
@@ -221,20 +231,15 @@ func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) err
 		}
 	}
 
-	nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
-	tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
-	if tg == nil {
-		return fmt.Errorf("no target client available")
-	}
-
+	// delete the config from the device
 	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: rootpaths.GetDeletePaths(gnmiPaths)})
 	if err != nil {
 		return err
 	}
 	r.l.Info("update", "resp", prototext.Format(setResp))
 
+	// set the last applied config to nil
 	cr.Status.LastAppliedConfig.Raw = nil
-
 	return nil
 
 }
