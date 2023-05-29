@@ -206,20 +206,27 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 		*/
 	}
 
-	/*
-		req, err := api.NewSetRequest(opts...)
-		if err != nil {
-			return err
-		}
-		setResp, err := tg.Set(ctx, req)
-		if err != nil {
-			return err
-		}
-	*/
+	j, err := ygot.EmitJSON(desiredGoStruct, &ygot.EmitJSONConfig{
+		Format: ygot.RFC7951,
+		Indent: "  ",
+		RFC7951Config: &ygot.RFC7951JSONConfig{
+			AppendModuleName: true,
+		},
+		SkipValidation: false,
+	})
+	if err != nil {
+		r.l.Error(err, "cannot construct json device info")
+		return err
+	}
 
 	// delete the config from the device
 
-	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: notification.GetDelete(), Update: notification.GetUpdate()})
+	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: notification.GetDelete(), Update: []*gnmi.Update{
+		{
+			Path: &gnmi.Path{},
+			Val:  &gnmi.TypedValue{Value: &gnmi.TypedValue_JsonIetfVal{JsonIetfVal: []byte(j)}},
+		},
+	}})
 	if err != nil {
 		return err
 	}
