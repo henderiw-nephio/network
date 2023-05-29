@@ -32,7 +32,6 @@ import (
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/openconfig/gnmi/proto/gnmi"
 	"github.com/openconfig/gnmic/api"
-	"github.com/openconfig/gnmic/utils"
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"
 	"google.golang.org/protobuf/encoding/prototext"
@@ -214,35 +213,13 @@ func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) err
 		return nil
 	}
 
-	rp := rootpaths.CreateRootConfigElement(r.m.SchemaTreeRoot)
-	// calculate the rootpaths for the deletion
+	// get the update paths
+	gnmiPaths := []*gnmi.Path{}
 	for _, n := range notifications {
-		for _, dp := range n.GetUpdate() {
-			// lookup the schema entry for the via path defined node
-			pathAndSchema := rootpaths.GetPathAndSchemaEntry(r.m.SchemaTreeRoot, dp.Path)
-			rp.Add(pathAndSchema, dp.Val)
+		for _, u := range n.GetUpdate() {
+			gnmiPaths = append(gnmiPaths, u.GetPath())
 		}
 	}
-
-	// collect the results of the rootpath calculation and performa a delete for
-	// all of these paths on the actual configuration
-	for _, p := range rp.GetRootPaths() {
-		fmt.Println("delete path: ", utils.GnmiPathToXPath(p, false))
-	}
-
-	/*
-		dps := []*gnmi.Path{}
-		for _, n := range notifications {
-			for _, u := range n.GetUpdate() {
-				r.l.Info("update", "data", u)
-				dps = append(dps, u.GetPath())
-			}
-		}
-
-		for _, p := range dps {
-			fmt.Println("delete path: ", utils.GnmiPathToXPath(p, false))
-		}
-	*/
 
 	nodeName := cr.Labels[invv1alpha1.NephioNodeNameKey]
 	tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
@@ -250,7 +227,7 @@ func (r *reconciler) Delete(ctx context.Context, cr *configv1alpha1.Network) err
 		return fmt.Errorf("no target client available")
 	}
 
-	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: rp.GetRootPaths()})
+	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: rootpaths.GetDeletePaths(gnmiPaths)})
 	if err != nil {
 		return err
 	}
