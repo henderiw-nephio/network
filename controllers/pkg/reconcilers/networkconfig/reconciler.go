@@ -194,17 +194,13 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 		fmt.Println("deletePath gpath: ", d)
 		//opts = append(opts, api.Delete(d))
 	}
+	/*
 	for _, u := range notification.GetUpdate() {
 		fmt.Println("updatePath xpath: ", utils.GnmiPathToXPath(u.GetPath(), false))
 		fmt.Println("value: ", u.GetVal())
 		fmt.Println("uodatePath gpath: ", u.GetPath())
-		/*
-			opts = append(opts, api.Update(
-				api.Path(u.GetPath()),
-				api.Value(u.GetVal(), api.EncodingASCII()),
-			))
-		*/
 	}
+	*/
 
 	j, err := ygot.EmitJSON(desiredGoStruct, &ygot.EmitJSONConfig{
 		Format: ygot.RFC7951,
@@ -218,9 +214,9 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 		r.l.Error(err, "cannot construct json device info")
 		return err
 	}
+	fmt.Println("update: \n", j)
 
-	// delete the config from the device
-
+	// the set cont
 	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: notification.GetDelete(), Update: []*gnmi.Update{
 		{
 			Path: &gnmi.Path{},
