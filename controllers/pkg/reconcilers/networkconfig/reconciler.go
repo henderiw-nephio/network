@@ -197,7 +197,7 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 	for _, u := range notification.GetUpdate() {
 		fmt.Println("updatePath xpath: ", utils.GnmiPathToXPath(u.GetPath(), false))
 		fmt.Println("value: ", u.GetVal())
-		fmt.Println("deletePath gpath: ", u.GetPath())
+		fmt.Println("uodatePath gpath: ", u.GetPath())
 		/*
 			opts = append(opts, api.Update(
 				api.Path(u.GetPath()),
