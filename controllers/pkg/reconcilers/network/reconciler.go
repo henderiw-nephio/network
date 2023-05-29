@@ -304,7 +304,6 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			return err
 		}
 
-		//fmt.Println(jsonString)
 		newNetwNodeConfig := configv1alpha1.BuildNetworkConfig(
 			metav1.ObjectMeta{
 				Name:            fmt.Sprintf("%s-%s", cr.Name, nodeName),
@@ -324,34 +323,6 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			corev1.ObjectReference{},
 			newNetwNodeConfig,
 		)
-
-		/*
-			tg := r.targets.Get(types.NamespacedName{Namespace: cr.Namespace, Name: nodeName})
-			if tg == nil {
-				return fmt.Errorf("no target client available")
-			}
-			setReq, err := api.NewSetRequest(
-				api.Update(
-					api.Path("/"),
-					api.Value(j, "json_ietf"),
-				))
-			if err != nil {
-				return err
-			}
-			setResp, err := tg.Set(ctx, setReq)
-			if err != nil {
-				return err
-			}
-			fmt.Println(prototext.Format(setResp))
-		*/
-
 	}
-	/*
-		for resourceName, r := range n.resources {
-			fmt.Println(resourceName)
-			b, _ := json.MarshalIndent(r, "", "  ")
-			fmt.Println(string(b))
-		}
-	*/
 	return nil
 }

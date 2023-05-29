@@ -149,6 +149,11 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		api.Username(string(secret.Data["username"])),
 		api.Password(string(secret.Data["password"])),
 	)
+	if err != nil {
+		r.l.Error(err, "cannot create target")
+		cr.SetConditions(allocv1alpha1.Failed(err.Error()))
+		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
+	}
 	err = tg.CreateGNMIClient(ctx)
 	if err != nil {
 		r.l.Error(err, "cannot create client")

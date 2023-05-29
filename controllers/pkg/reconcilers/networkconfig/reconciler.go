@@ -184,19 +184,50 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 		return nil
 	}
 
+	/*
+		opts := []api.GNMIOption{
+			api.EncodingASCII(),
+		}
+	*/
 	for _, d := range notification.GetDelete() {
-		fmt.Println("deletePath: ", utils.GnmiPathToXPath(d, false))
+		fmt.Println("deletePath xpath: ", utils.GnmiPathToXPath(d, false))
+		fmt.Println("deletePath gpath: ", d)
+		//opts = append(opts, api.Delete(d))
 	}
 	for _, u := range notification.GetUpdate() {
-		fmt.Println("updatePath: ", utils.GnmiPathToXPath(u.GetPath(), false))
+		fmt.Println("updatePath xpath: ", utils.GnmiPathToXPath(u.GetPath(), false))
 		fmt.Println("value: ", u.GetVal())
+		fmt.Println("deletePath gpath: ", u.GetPath())
+		/*
+			opts = append(opts, api.Update(
+				api.Path(u.GetPath()),
+				api.Value(u.GetVal(), api.EncodingASCII()),
+			))
+		*/
 	}
 
+	/*
+		req, err := api.NewSetRequest(opts...)
+		if err != nil {
+			return err
+		}
+		setResp, err := tg.Set(ctx, req)
+		if err != nil {
+			return err
+		}
+	*/
+
 	// delete the config from the device
-	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: notification.GetDelete(), Update: notification.GetUpdate()})
+
+	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Prefix: &gnmi.Path{
+		Elem: []*gnmi.PathElem{
+
+		},
+	}, Delete: notification.GetDelete(), Update: notification.GetUpdate()})
 	if err != nil {
 		return err
 	}
+
 	r.l.Info("update", "resp", prototext.Format(setResp))
 
 	// set the last applied config to nil
