@@ -219,11 +219,7 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 
 	// delete the config from the device
 
-	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Prefix: &gnmi.Path{
-		Elem: []*gnmi.PathElem{
-
-		},
-	}, Delete: notification.GetDelete(), Update: notification.GetUpdate()})
+	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: notification.GetDelete(), Update: notification.GetUpdate()})
 	if err != nil {
 		return err
 	}
