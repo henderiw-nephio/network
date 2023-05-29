@@ -215,8 +215,8 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 			}
 			for selectorName, eps := range selectedEndpoints {
 				for _, ep := range eps {
+					rtName := rt.Name
 					if !tr.IsAlreadyDone(ep.Spec.NodeName, ep.Spec.InterfaceName) {
-						rtName := fmt.Sprintf("%s-rt", rt.Name)
 
 						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
 							o := r.populateVlanDatabase(selectorName, cr)
@@ -238,6 +238,17 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 						// create interface/subinterface + networkInstance interface +
 						if err := r.PopulateRoutedInterface(ctx, cr, selectorName, rtName, ep, itfce.AttachmentType, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
 							return err
+						}
+					}
+					if rtName == "default" {
+						if !tr.IsAlreadyDone(ep.Spec.NodeName, "") {
+							if r.apply {
+								// we can return here since we do another stage
+								continue
+							}
+							if err := r.PopulateNode(ctx, cr, ep.Spec.NodeName, rtName, rt.Prefixes); err != nil {
+								return err
+							}
 						}
 					}
 				}
