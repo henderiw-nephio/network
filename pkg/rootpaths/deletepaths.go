@@ -44,6 +44,9 @@ func GetDeletePaths(gnmiPaths []*gnmi.Path) []*gnmi.Path {
 	deletePaths := []*gnmi.Path{}
 	for _, p := range gnmiPaths {
 		overlaps := false // ensures the first path is added as a deletepath since nothing exists
+		if len(p.Elem) == 1 && p.Elem[0].Name == "interface" {
+			continue
+		}
 		for _, dp := range deletePaths {
 			overlaps = true
 			for i := 0; i < len(dp.Elem); i++ {

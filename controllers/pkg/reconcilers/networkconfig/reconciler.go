@@ -195,11 +195,11 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 		//opts = append(opts, api.Delete(d))
 	}
 	/*
-	for _, u := range notification.GetUpdate() {
-		fmt.Println("updatePath xpath: ", utils.GnmiPathToXPath(u.GetPath(), false))
-		fmt.Println("value: ", u.GetVal())
-		fmt.Println("uodatePath gpath: ", u.GetPath())
-	}
+		for _, u := range notification.GetUpdate() {
+			fmt.Println("updatePath xpath: ", utils.GnmiPathToXPath(u.GetPath(), false))
+			fmt.Println("value: ", u.GetVal())
+			fmt.Println("uodatePath gpath: ", u.GetPath())
+		}
 	*/
 
 	j, err := ygot.EmitJSON(desiredGoStruct, &ygot.EmitJSONConfig{
@@ -217,7 +217,8 @@ func (r *reconciler) Upsert(ctx context.Context, cr *configv1alpha1.Network) err
 	fmt.Println("update: \n", j)
 
 	// the set cont
-	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: notification.GetDelete(), Update: []*gnmi.Update{
+
+	setResp, err := tg.Set(ctx, &gnmi.SetRequest{Delete: rootpaths.GetDeletePaths(notification.GetDelete()), Update: []*gnmi.Update{
 		{
 			Path: &gnmi.Path{},
 			Val:  &gnmi.TypedValue{Value: &gnmi.TypedValue_JsonIetfVal{JsonIetfVal: []byte(j)}},
