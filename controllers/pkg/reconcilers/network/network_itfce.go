@@ -131,9 +131,20 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 	for _, prefix := range prefixes {
 		pi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
 
-		prefixLength := 24
-		if pi.IsIpv6() {
-			prefixLength = 64
+		prefixKind := ipamv1alpha1.PrefixKindNetwork
+		if value, ok := prefix.Labels[allocv1alpha1.NephioPrefixKindKey]; ok {
+			prefixKind = ipamv1alpha1.GetPrefixKindFromString(value)
+		}
+
+		prefixLength := 64
+		if pi.IsIpv4() {
+			prefixLength = 24
+		}
+		if rtName == "default" {
+			prefixLength = 127
+			if pi.IsIpv4() {
+				prefixLength = 31
+			}
 		}
 		af := pi.GetAddressFamily()
 
@@ -176,41 +187,43 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 			allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
 		}
 
-		prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
-			metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-%s", LinkName, nodeName),
-				Namespace: cr.Namespace,
-			},
-			ipamv1alpha1.IPAllocationSpec{
-				Kind:            ipamv1alpha1.PrefixKindNetwork,
-				NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
-				AddressFamily:   &af,
-				AllocationLabels: allocv1alpha1.AllocationLabels{
-					UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-						Labels: map[string]string{
-							allocv1alpha1.NephioGatewayKey: "true",
+		if prefixKind == ipamv1alpha1.PrefixKindNetwork {
+			prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
+				metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-%s", LinkName, nodeName),
+					Namespace: cr.Namespace,
+				},
+				ipamv1alpha1.IPAllocationSpec{
+					Kind:            ipamv1alpha1.PrefixKindNetwork,
+					NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
+					AddressFamily:   &af,
+					AllocationLabels: allocv1alpha1.AllocationLabels{
+						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+							Labels: map[string]string{
+								allocv1alpha1.NephioGatewayKey: "true",
+							},
+						},
+						Selector: &metav1.LabelSelector{
+							MatchLabels: addressSelectorLabels,
 						},
 					},
-					Selector: &metav1.LabelSelector{
-						MatchLabels: addressSelectorLabels,
-					},
 				},
-			},
-			ipamv1alpha1.IPAllocationStatus{},
-		), nil)
-		if err != nil {
-			return err
-		}
-		if pi.IsIpv6() {
-			ipv6 := si.GetOrCreateIpv6()
-			ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
-				IpPrefix: prefixAlloc.Status.Prefix,
-			})
-		} else {
-			ipv4 := si.GetOrCreateIpv4()
-			ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
-				IpPrefix: prefixAlloc.Status.Prefix,
-			})
+				ipamv1alpha1.IPAllocationStatus{},
+			), nil)
+			if err != nil {
+				return err
+			}
+			if pi.IsIpv6() {
+				ipv6 := si.GetOrCreateIpv6()
+				ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
+					IpPrefix: prefixAlloc.Status.Prefix,
+				})
+			} else {
+				ipv4 := si.GetOrCreateIpv4()
+				ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
+					IpPrefix: prefixAlloc.Status.Prefix,
+				})
+			}
 		}
 		si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
 
@@ -263,58 +276,26 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
 			}
 
-			prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
-			prefixName = strings.ReplaceAll(prefixName, ":", "-")
-			_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
-				metav1.ObjectMeta{
-					Name:      prefixName,
-					Namespace: cr.Namespace,
-				},
-				ipamv1alpha1.IPAllocationSpec{
-					Kind:            prefixKind,
-					NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
-					AddressFamily:   &af,
-					PrefixLength:    util.PointerUint8(prefixLength),
-					CreatePrefix:    pointer.Bool(true),
-					AllocationLabels: allocv1alpha1.AllocationLabels{
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-							Labels: labels,
-						},
-						Selector: &metav1.LabelSelector{
-							MatchLabels: prefixSelectorLabels,
-						},
-					},
-				},
-				ipamv1alpha1.IPAllocationStatus{},
-			), nil)
-			if err != nil {
-				return err
-			}
-			// for network based prefixes i will allocate a gateway IP
 			if prefixKind == ipamv1alpha1.PrefixKindNetwork {
-				// add the selector labels to the labels to ensure we pick the right prefix
-				addressSelectorLabels := map[string]string{
-					allocv1alpha1.NephioNsnNameKey:           prefixName,
-					allocv1alpha1.NephioNsnNamespaceKey:      cr.Namespace,
-				}
-
-				prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
+				prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
+				prefixName = strings.ReplaceAll(prefixName, ":", "-")
+				_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 					metav1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-gateway", prefixName),
+						Name:      prefixName,
 						Namespace: cr.Namespace,
 					},
 					ipamv1alpha1.IPAllocationSpec{
 						Kind:            prefixKind,
 						NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
 						AddressFamily:   &af,
+						PrefixLength:    util.PointerUint8(prefixLength),
+						CreatePrefix:    pointer.Bool(true),
 						AllocationLabels: allocv1alpha1.AllocationLabels{
 							UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-								Labels: map[string]string{
-									allocv1alpha1.NephioGatewayKey: "true",
-								},
+								Labels: labels,
 							},
 							Selector: &metav1.LabelSelector{
-								MatchLabels: addressSelectorLabels,
+								MatchLabels: prefixSelectorLabels,
 							},
 						},
 					},
@@ -323,27 +304,62 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 				if err != nil {
 					return err
 				}
-				if pi.IsIpv6() {
-					ipv6 := si.GetOrCreateIpv6()
-					ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
-						AnycastGw: ygot.Bool(true),
-						IpPrefix:  prefixAlloc.Status.Prefix,
-					})
-					ipv6.GetOrCreateNeighborDiscovery().LearnUnsolicited = ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_NeighborDiscovery_LearnUnsolicited_global
-					ipv6.NeighborDiscovery.GetOrCreateHostRoute().GetOrCreatePopulate(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_HostRoute_Populate_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
-					ipv6.NeighborDiscovery.GetOrCreateEvpn().GetOrCreateAdvertise(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
-				} else {
-					ipv4 := si.GetOrCreateIpv4()
-					ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
-						AnycastGw: ygot.Bool(true),
-						IpPrefix:  prefixAlloc.Status.Prefix,
-					})
-					ipv4.GetOrCreateArp().LearnUnsolicited = ygot.Bool(true)
-					ipv4.Arp.GetOrCreateHostRoute().GetOrCreatePopulate(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_HostRoute_Populate_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
-					ipv4.Arp.GetOrCreateEvpn().GetOrCreateAdvertise(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
+				// for network based prefixes i will allocate a gateway IP
+				if prefixKind == ipamv1alpha1.PrefixKindNetwork {
+					// add the selector labels to the labels to ensure we pick the right prefix
+					addressSelectorLabels := map[string]string{
+						allocv1alpha1.NephioNsnNameKey:      prefixName,
+						allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
+					}
+
+					prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
+						metav1.ObjectMeta{
+							Name:      fmt.Sprintf("%s-gateway", prefixName),
+							Namespace: cr.Namespace,
+						},
+						ipamv1alpha1.IPAllocationSpec{
+							Kind:            prefixKind,
+							NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
+							AddressFamily:   &af,
+							AllocationLabels: allocv1alpha1.AllocationLabels{
+								UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+									Labels: map[string]string{
+										allocv1alpha1.NephioGatewayKey: "true",
+									},
+								},
+								Selector: &metav1.LabelSelector{
+									MatchLabels: addressSelectorLabels,
+								},
+							},
+						},
+						ipamv1alpha1.IPAllocationStatus{},
+					), nil)
+					if err != nil {
+						return err
+					}
+					if pi.IsIpv6() {
+						ipv6 := si.GetOrCreateIpv6()
+						ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
+							AnycastGw: ygot.Bool(true),
+							IpPrefix:  prefixAlloc.Status.Prefix,
+						})
+						ipv6.GetOrCreateNeighborDiscovery().LearnUnsolicited = ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_NeighborDiscovery_LearnUnsolicited_global
+						ipv6.NeighborDiscovery.GetOrCreateHostRoute().GetOrCreatePopulate(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_HostRoute_Populate_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
+						ipv6.NeighborDiscovery.GetOrCreateEvpn().GetOrCreateAdvertise(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
+					} else {
+						ipv4 := si.GetOrCreateIpv4()
+						ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
+							AnycastGw: ygot.Bool(true),
+							IpPrefix:  prefixAlloc.Status.Prefix,
+						})
+						ipv4.GetOrCreateArp().LearnUnsolicited = ygot.Bool(true)
+						ipv4.Arp.GetOrCreateHostRoute().GetOrCreatePopulate(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_HostRoute_Populate_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
+						ipv4.Arp.GetOrCreateEvpn().GetOrCreateAdvertise(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
+					}
+					si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
 				}
-				si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
 			}
+
 		}
 	}
 	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
