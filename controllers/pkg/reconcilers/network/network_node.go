@@ -116,17 +116,16 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 						MaskLengthRange: ygot.String("128..128"),
 					},
 				}
-				rp.Statement = map[uint32]*ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement{
-					20: {
-						SequenceId: ygot.Uint32(20),
-						Match: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Match{
-							PrefixSet: ygot.String("local-ipv6"),
-						},
-						Action: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Action{
-							PolicyResult: ygotsrl.E_SrlNokiaPolicyTypes_PolicyResultType(1),
-						},
+				rp.GetOrCreateStatement(20)
+				rp.AppendStatement(&ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement{
+					SequenceId: ygot.Uint32(20),
+					Match: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Match{
+						PrefixSet: ygot.String("local-ipv6"),
 					},
-				}
+					Action: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Action{
+						PolicyResult: ygotsrl.E_SrlNokiaPolicyTypes_PolicyResultType(1),
+					},
+				})
 			} else {
 				ipv4 := si.GetOrCreateIpv4()
 				ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
@@ -143,17 +142,16 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 						MaskLengthRange: ygot.String("32..32"),
 					},
 				}
-				rp.Statement = map[uint32]*ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement{
-					10: {
-						SequenceId: ygot.Uint32(10),
-						Match: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Match{
-							PrefixSet: ygot.String("local-ipv4"),
-						},
-						Action: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Action{
-							PolicyResult: ygotsrl.E_SrlNokiaPolicyTypes_PolicyResultType(1),
-						},
+				rp.GetOrCreateStatement(10)
+				rp.AppendStatement(&ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement{
+					SequenceId: ygot.Uint32(10),
+					Match: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Match{
+						PrefixSet: ygot.String("local-ipv4"),
 					},
-				}
+					Action: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Action{
+						PolicyResult: ygotsrl.E_SrlNokiaPolicyTypes_PolicyResultType(1),
+					},
+				})
 			}
 		}
 
