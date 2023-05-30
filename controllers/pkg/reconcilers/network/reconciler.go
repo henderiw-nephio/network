@@ -336,7 +336,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			return err
 		}
 
-		newNetwNodeConfig := configv1alpha1.BuildNetworkConfig(
+		o := configv1alpha1.BuildNetworkConfig(
 			metav1.ObjectMeta{
 				Name:            fmt.Sprintf("%s-%s", cr.Name, nodeName),
 				Namespace:       cr.Namespace,
@@ -348,12 +348,12 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 				},
 			}, configv1alpha1.NetworkStatus{})
 		if existingNetwNodeConfig, ok := networkConfigs[fmt.Sprintf("%s-%s", cr.Name, nodeName)]; ok {
-			newNetwNodeConfig.Status.LastAppliedConfig = existingNetwNodeConfig.Status.LastAppliedConfig
+			o.Status.LastAppliedConfig = existingNetwNodeConfig.Status.LastAppliedConfig
 		}
 
 		r.resources.AddNewResource(
-			corev1.ObjectReference{},
-			newNetwNodeConfig,
+			corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace},
+			o,
 		)
 	}
 	return nil

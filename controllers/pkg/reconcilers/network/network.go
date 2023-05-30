@@ -83,7 +83,7 @@ func (r *network) populateVlanDatabase(selectorName string, cr *infrav1alpha1.Ne
 		vlanv1alpha1.VLANDatabaseStatus{},
 	)
 	r.resources.AddNewResource(
-		corev1.ObjectReference{APIVersion: o.GetResourceVersion(), Kind: o.GetObjectKind().GroupVersionKind().Kind, Name: o.GetName(), Namespace: o.GetNamespace()},
+		corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace},
 		o,
 	)
 	return o
