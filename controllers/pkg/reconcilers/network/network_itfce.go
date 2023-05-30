@@ -119,7 +119,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 
 	si := i.GetOrCreateSubinterface(uint32(vlanId))
 	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_routed
-	
+
 	if attachmentType == reqv1alpha1.AttachmentTypeVLAN {
 		i.VlanTagging = ygot.Bool(true)
 		si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
@@ -157,6 +157,8 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 				allocv1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
 				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
 			}
+
+			labels[allocv1alpha1.NephioPurposeKey] = "link prefix"
 
 			// allocate link prefix
 			prefixName := fmt.Sprintf("%s-%s", ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()), LinkName)
@@ -204,6 +206,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
 							Labels: map[string]string{
 								allocv1alpha1.NephioGatewayKey: "true",
+								allocv1alpha1.NephioPurposeKey: "link endpoint address",
 							},
 						},
 						Selector: &metav1.LabelSelector{
@@ -275,6 +278,8 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
 			}
 
+			labels[allocv1alpha1.NephioPurposeKey] = "irb prefix"
+
 			if prefixKind == ipamv1alpha1.PrefixKindNetwork {
 				prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
 				prefixName = strings.ReplaceAll(prefixName, ":", "-")
@@ -324,6 +329,7 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 								UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
 									Labels: map[string]string{
 										allocv1alpha1.NephioGatewayKey: "true",
+										allocv1alpha1.NephioPurposeKey: "irb address",
 									},
 								},
 								Selector: &metav1.LabelSelector{

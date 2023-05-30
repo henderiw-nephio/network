@@ -84,7 +84,8 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 					AllocationLabels: allocv1alpha1.AllocationLabels{
 						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
 							Labels: map[string]string{
-								invv1alpha1.NephioNodeNameKey: nodeName,
+								invv1alpha1.NephioNodeNameKey:  nodeName,
+								allocv1alpha1.NephioPurposeKey: "node loopback address",
 							},
 						},
 						Selector: &metav1.LabelSelector{
