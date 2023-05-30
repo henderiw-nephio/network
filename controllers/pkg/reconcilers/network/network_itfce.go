@@ -136,75 +136,44 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 			prefixKind = ipamv1alpha1.GetPrefixKindFromString(value)
 		}
 
-		prefixLength := 64
-		if pi.IsIpv4() {
-			prefixLength = 24
-		}
-		if rtName == "default" {
-			prefixLength = 127
-			if pi.IsIpv4() {
-				prefixLength = 31
-			}
-		}
-		af := pi.GetAddressFamily()
-
-		// add the prefix labels to the prefix selector labels
-		prefixSelectorLabels := map[string]string{
-			allocv1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
-			allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
-		}
-
-		// allocate link prefix
-		prefixName := fmt.Sprintf("%s-%s", ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()), LinkName)
-		_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
-			metav1.ObjectMeta{
-				Name:      prefixName,
-				Namespace: cr.Namespace,
-			},
-			ipamv1alpha1.IPAllocationSpec{
-				Kind:            ipamv1alpha1.PrefixKindNetwork,
-				NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
-				AddressFamily:   &af,
-				PrefixLength:    util.PointerUint8(prefixLength),
-				CreatePrefix:    pointer.Bool(true),
-				AllocationLabels: allocv1alpha1.AllocationLabels{
-					UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-						Labels: labels,
-					},
-					Selector: &metav1.LabelSelector{
-						MatchLabels: prefixSelectorLabels,
-					},
-				},
-			},
-			ipamv1alpha1.IPAllocationStatus{},
-		), nil)
-		if err != nil {
-			return err
-		}
-
-		addressSelectorLabels := map[string]string{
-			allocv1alpha1.NephioNsnNameKey:      prefixName,
-			allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
-		}
-
 		if prefixKind == ipamv1alpha1.PrefixKindNetwork {
-			prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
+			prefixLength := 64
+			if pi.IsIpv4() {
+				prefixLength = 24
+			}
+			if rtName == "default" {
+				prefixLength = 127
+				if pi.IsIpv4() {
+					prefixLength = 31
+				}
+			}
+			af := pi.GetAddressFamily()
+
+			// add the prefix labels to the prefix selector labels
+			prefixSelectorLabels := map[string]string{
+				allocv1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
+				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
+			}
+
+			// allocate link prefix
+			prefixName := fmt.Sprintf("%s-%s", ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()), LinkName)
+			_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 				metav1.ObjectMeta{
-					Name:      fmt.Sprintf("%s-%s", LinkName, nodeName),
+					Name:      prefixName,
 					Namespace: cr.Namespace,
 				},
 				ipamv1alpha1.IPAllocationSpec{
 					Kind:            ipamv1alpha1.PrefixKindNetwork,
 					NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
 					AddressFamily:   &af,
+					PrefixLength:    util.PointerUint8(prefixLength),
+					CreatePrefix:    pointer.Bool(true),
 					AllocationLabels: allocv1alpha1.AllocationLabels{
 						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-							Labels: map[string]string{
-								allocv1alpha1.NephioGatewayKey: "true",
-							},
+							Labels: labels,
 						},
 						Selector: &metav1.LabelSelector{
-							MatchLabels: addressSelectorLabels,
+							MatchLabels: prefixSelectorLabels,
 						},
 					},
 				},
@@ -213,24 +182,54 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 			if err != nil {
 				return err
 			}
-			if pi.IsIpv6() {
-				ipv6 := si.GetOrCreateIpv6()
-				ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
-					IpPrefix: prefixAlloc.Status.Prefix,
-				})
-			} else {
-				ipv4 := si.GetOrCreateIpv4()
-				ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
-					IpPrefix: prefixAlloc.Status.Prefix,
-				})
-			}
-		}
-		si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
 
+			addressSelectorLabels := map[string]string{
+				allocv1alpha1.NephioNsnNameKey:      prefixName,
+				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
+			}
+
+			if prefixKind == ipamv1alpha1.PrefixKindNetwork {
+				prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
+					metav1.ObjectMeta{
+						Name:      fmt.Sprintf("%s-%s", LinkName, nodeName),
+						Namespace: cr.Namespace,
+					},
+					ipamv1alpha1.IPAllocationSpec{
+						Kind:            ipamv1alpha1.PrefixKindNetwork,
+						NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
+						AddressFamily:   &af,
+						AllocationLabels: allocv1alpha1.AllocationLabels{
+							UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+								Labels: map[string]string{
+									allocv1alpha1.NephioGatewayKey: "true",
+								},
+							},
+							Selector: &metav1.LabelSelector{
+								MatchLabels: addressSelectorLabels,
+							},
+						},
+					},
+					ipamv1alpha1.IPAllocationStatus{},
+				), nil)
+				if err != nil {
+					return err
+				}
+				if pi.IsIpv6() {
+					ipv6 := si.GetOrCreateIpv6()
+					ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
+						IpPrefix: prefixAlloc.Status.Prefix,
+					})
+				} else {
+					ipv4 := si.GetOrCreateIpv4()
+					ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
+						IpPrefix: prefixAlloc.Status.Prefix,
+					})
+				}
+			}
+			si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
+		}
 	}
 
-	//si.Ipv4
-	//si.IPv6
 	ni := r.devices[nodeName].GetOrCreateNetworkInstance(rtName)
 	ni.GetOrCreateInterface(niItfceSubItfceName)
 	return nil
