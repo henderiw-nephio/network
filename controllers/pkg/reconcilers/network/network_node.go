@@ -161,6 +161,7 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 
 	}
 	ni := d.GetOrCreateNetworkInstance(rtName)
+	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_default
 	ni.GetOrCreateInterface(niItfceSubItfceName)
 
 	bgp := ni.GetOrCreateProtocols().GetOrCreateBgp()

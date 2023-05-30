@@ -86,6 +86,7 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, cr *infrav1alpha1
 	}
 	
 	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
+	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
 	ni.GetOrCreateInterface(niItfceSubItfceName)
 	return nil
 }
@@ -237,6 +238,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 	}
 
 	ni := r.devices[nodeName].GetOrCreateNetworkInstance(rtName)
+	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
 	ni.GetOrCreateInterface(niItfceSubItfceName)
 	return nil
 }
@@ -371,8 +373,10 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 		}
 	}
 	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
+	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
 	if routed {
 		ni = r.devices[nodeName].GetOrCreateNetworkInstance(rtName)
+		ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
 	}
 	ni.GetOrCreateInterface(niItfceSubItfceName)
 	return nil
