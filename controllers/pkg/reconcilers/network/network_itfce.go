@@ -195,7 +195,7 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 
 			prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 				metav1.ObjectMeta{
-					Name:      fmt.Sprintf("%s-%s", LinkName, nodeName),
+					Name:      fmt.Sprintf("%s-%s", prefixName, nodeName),
 					Namespace: cr.Namespace,
 				},
 				ipamv1alpha1.IPAllocationSpec{
