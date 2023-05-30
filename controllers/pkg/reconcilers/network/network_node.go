@@ -100,13 +100,11 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 			}
 
 			if pi.IsIpv6() {
-				si.Ipv6 = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6{
-					Address: map[string]*ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
-						*prefixAlloc.Status.Prefix: {
-							IpPrefix: prefixAlloc.Status.Prefix,
-						},
-					},
-				}
+				ipv6 := si.GetOrCreateIpv6()
+				ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
+					IpPrefix: prefixAlloc.Status.Prefix,
+				})
+
 				polPsIpv6 := d.GetOrCreateRoutingPolicy().GetOrCreatePrefixSet("local-ipv6")
 				polPsIpv6Key := ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_PrefixSet_Prefix_Key{
 					IpPrefix:        pi.GetIPPrefix().String(),
@@ -130,13 +128,10 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 					},
 				}
 			} else {
-				si.Ipv4 = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4{
-					Address: map[string]*ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
-						*prefixAlloc.Status.Prefix: {
-							IpPrefix: prefixAlloc.Status.Prefix,
-						},
-					},
-				}
+				ipv4 := si.GetOrCreateIpv4()
+				ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
+					IpPrefix: prefixAlloc.Status.Prefix,
+				})
 				polPsIpv4 := d.GetOrCreateRoutingPolicy().GetOrCreatePrefixSet("local-ipv4")
 				polPsIpv4Key := ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_PrefixSet_Prefix_Key{
 					IpPrefix:        pi.GetIPPrefix().String(),
