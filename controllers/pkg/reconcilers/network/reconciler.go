@@ -298,6 +298,9 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 		return err
 	}
 
+	for _, node := range nodes.Items {
+		r.l.Info("node", "node info", node)
+	}
 	if err := n.PopulateDefault(ctx, cr); err != nil {
 		r.l.Error(err, "cannot populate routing Tables")
 		return err

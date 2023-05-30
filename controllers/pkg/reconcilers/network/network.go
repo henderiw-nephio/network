@@ -251,6 +251,7 @@ func (r *network) PopulateDefault(ctx context.Context, cr *infrav1alpha1.Network
 	for _, rt := range cr.Spec.RoutingTables {
 		if rt.Name == "default" {
 			for _, node := range r.nodes.GetNodes() {
+				fmt.Println("populate default node: ", node.Name)
 				if err := r.PopulateNode(ctx, cr, node.Name, rt.Name, rt.Prefixes); err != nil {
 					return errors.Wrap(err, "cannot populate node")
 				}
