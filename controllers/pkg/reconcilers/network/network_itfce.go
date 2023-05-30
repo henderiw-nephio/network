@@ -38,7 +38,10 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-const irbInterfaceName = "irb0"
+const (
+	irbInterfaceName = "irb0"
+	systemInterfaceName = "system0"
+)
 
 func (r *network) PopulateBridgeInterface(ctx context.Context, cr *infrav1alpha1.Network, selectorName, bdName string, ep invv1alpha1.Endpoint, attachmentType reqv1alpha1.AttachmentType) error {
 	nodeName := ep.Spec.NodeName

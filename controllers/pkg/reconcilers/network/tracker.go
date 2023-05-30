@@ -31,6 +31,8 @@ type tracker struct {
 	t map[string]map[string]struct{}
 }
 
+// IsAlreadyDone serves 2 purposes
+// it fills out the struct + it checks if an entry exists already
 func (r *tracker) IsAlreadyDone(nodeName string, groupName string) bool {
 	r.m.Lock()
 	defer r.m.Unlock()

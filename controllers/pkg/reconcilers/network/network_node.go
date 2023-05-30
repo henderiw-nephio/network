@@ -39,15 +39,15 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 		r.devices[nodeName] = new(ygotsrl.Device)
 	}
 	d := r.devices[nodeName]
-	i := d.GetOrCreateInterface("system0")
+	i := d.GetOrCreateInterface(systemInterfaceName)
 	//i.AdminState = ygotsrl.SrlNokiaCommon_AdminState_enable
 	i.Description = ygot.String("system interface")
 
 	siIndex := 0
-	niItfceSubItfceName := strings.Join([]string{irbInterfaceName, strconv.Itoa(int(siIndex))}, ".")
+	niItfceSubItfceName := strings.Join([]string{systemInterfaceName, strconv.Itoa(int(siIndex))}, ".")
 	si := i.GetOrCreateSubinterface(uint32(siIndex))
 	//si.AdminState = ygotsrl.SrlNokiaCommon_AdminState_enable
-	si.Description = ygot.String(strings.Join([]string{"system0", "infra"}, "-"))
+	si.Description = ygot.String(strings.Join([]string{systemInterfaceName, "infra"}, "-"))
 
 	// create a routing policy
 	rp := d.GetOrCreateRoutingPolicy().GetOrCreatePolicy("export-local")
