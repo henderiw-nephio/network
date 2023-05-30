@@ -116,8 +116,8 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 						MaskLengthRange: ygot.String("128..128"),
 					},
 				}
-				rp.GetOrCreateStatement(20)
-				rp.AppendStatement(&ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement{
+				//rp.GetOrCreateStatement(20)
+				if err := rp.AppendStatement(&ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement{
 					SequenceId: ygot.Uint32(20),
 					Match: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Match{
 						PrefixSet: ygot.String("local-ipv6"),
@@ -125,7 +125,9 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 					Action: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Action{
 						PolicyResult: ygotsrl.E_SrlNokiaPolicyTypes_PolicyResultType(1),
 					},
-				})
+				}); err != nil {
+					return err
+				}
 			} else {
 				ipv4 := si.GetOrCreateIpv4()
 				ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
@@ -142,8 +144,8 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 						MaskLengthRange: ygot.String("32..32"),
 					},
 				}
-				rp.GetOrCreateStatement(10)
-				rp.AppendStatement(&ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement{
+				//rp.GetOrCreateStatement(10)
+				if err := rp.AppendStatement(&ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement{
 					SequenceId: ygot.Uint32(10),
 					Match: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Match{
 						PrefixSet: ygot.String("local-ipv4"),
@@ -151,7 +153,9 @@ func (r *network) PopulateNode(ctx context.Context, cr *infrav1alpha1.Network, n
 					Action: &ygotsrl.SrlNokiaRoutingPolicy_RoutingPolicy_Policy_Statement_Action{
 						PolicyResult: ygotsrl.E_SrlNokiaPolicyTypes_PolicyResultType(1),
 					},
-				})
+				}); err != nil {
+					return err
+				}
 			}
 		}
 
