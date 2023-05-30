@@ -18,7 +18,6 @@ package network
 
 import (
 	"context"
-	"strings"
 
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"
@@ -66,7 +65,7 @@ func (r *network) PopulateRoutingInstance(ctx context.Context, nodeName, selecto
 
 	ni := r.devices[nodeName].GetOrCreateNetworkInstance(rtName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
-	if strings.HasPrefix(rtName, "default") {
+	if rtName == "default" {
 		ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_default
 	}
 

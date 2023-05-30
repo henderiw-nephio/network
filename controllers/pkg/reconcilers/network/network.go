@@ -55,7 +55,7 @@ func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable, cr 
 	// create IPAM NetworkInstance
 	o := ipamv1alpha1.BuildNetworkInstance(
 		metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-rt", rt.Name),
+			Name:            rt.Name,
 			Namespace:       cr.Namespace,
 			Labels:          getMatchingLabels(cr),
 			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
@@ -182,7 +182,7 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 							for selectorName, eps := range selectedEndpoints {
 								for _, ep := range eps {
 									if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
-										rtName := fmt.Sprintf("%s-rt", rt.Name)
+										rtName := rt.Name
 										bdName := fmt.Sprintf("%s-bd", bd.Name)
 										if itfce.Selector != nil {
 											bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
