@@ -28,6 +28,7 @@ import (
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
+	"github.com/pkg/errors"
 
 	//"github.com/nokia/k8s-ipam/pkg/resource"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
@@ -40,15 +41,14 @@ import (
 
 type network struct {
 	resource.APIPatchingApplicator
-	apply     bool
-	devices   map[string]*ygotsrl.Device
-	resources resources.Resources
-	//resources       map[corev1.ObjectReference]client.Object
+	apply           bool
+	devices         map[string]*ygotsrl.Device
+	resources       resources.Resources
 	eps             *endpoints
+	nodes           *nodes
 	hash            hash.HashTable
 	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
 	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]
-	//targets         targets.Target
 }
 
 func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable, cr *infrav1alpha1.Network) client.Object {
@@ -240,17 +240,19 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 							return err
 						}
 					}
-					if rtName == "default" {
-						if !tr.IsAlreadyDone(ep.Spec.NodeName, "") {
-							if r.apply {
-								// we can return here since we do another stage
-								continue
-							}
-							if err := r.PopulateNode(ctx, cr, ep.Spec.NodeName, rtName, rt.Prefixes); err != nil {
-								return err
-							}
-						}
-					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (r *network) PopulateDefault(ctx context.Context, cr *infrav1alpha1.Network) error {
+	for _, rt := range cr.Spec.RoutingTables {
+		if rt.Name == "default" {
+			for _, node := range r.nodes.GetNodes() {
+				if err := r.PopulateNode(ctx, cr, node.Name, rt.Name, rt.Prefixes); err != nil {
+					return errors.Wrap(err, "cannot populate node")
 				}
 			}
 		}

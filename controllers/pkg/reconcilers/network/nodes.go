@@ -16,16 +16,24 @@ limitations under the License.
 
 package network
 
-type iterator[T any] struct {
-	curIdx int
-	items  []T
+import (
+	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
+)
+
+type nodes struct {
+	*invv1alpha1.NodeList
 }
 
-func (r *iterator[T]) HasNext() bool {
-	r.curIdx++
-	return r.curIdx < len(r.items)
+func (r *nodes) iterator() *iterator[invv1alpha1.Node] {
+	return &iterator[invv1alpha1.Node]{curIdx: -1, items: r.Items}
 }
 
-func (r *iterator[T]) Value() T {
-	return r.items[r.curIdx]
+func (r *nodes) GetNodes() []invv1alpha1.Node {
+	nodes := []invv1alpha1.Node{}
+
+	iter := r.iterator()
+	for iter.HasNext() {
+		nodes = append(nodes, iter.Value())
+	}
+	return nodes
 }
