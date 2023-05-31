@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package network
+package endpoints
 
 import (
 	"sort"
@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-type endpoints struct {
+type Endpoints struct {
 	*invv1alpha1.EndpointList
 }
 
@@ -43,15 +43,13 @@ func getKeys(s *metav1.LabelSelector) []string {
 	return keys
 }
 
-
-
-func (r *endpoints) iterator() *iterator[invv1alpha1.Endpoint] {
+func (r *Endpoints) iterator() *iterator[invv1alpha1.Endpoint] {
 	return &iterator[invv1alpha1.Endpoint]{curIdx: -1, items: r.Items}
 }
 
 // GetUniqueKeyValues returns unique values based on the selector keys
 // e.g. used to return the unique clusters endpoints if the selector is about clusters
-func (r *endpoints) GetUniqueKeyValues(selector labels.Selector, keys []string) []string {
+func (r *Endpoints) GetUniqueKeyValues(selector labels.Selector, keys []string) []string {
 	values := []string{}
 	lvalues := map[string]struct{}{}
 
@@ -83,7 +81,7 @@ func getKeyValueName(labels map[string]string, keys []string) string {
 	return sb.String()
 }
 
-func (r *endpoints) GetNodes(selector labels.Selector) []string {
+func (r *Endpoints) GetNodes(selector labels.Selector) []string {
 	values := []string{}
 	lvalues := map[string]struct{}{}
 
@@ -99,7 +97,7 @@ func (r *endpoints) GetNodes(selector labels.Selector) []string {
 	return values
 }
 
-func (r *endpoints) GetEndpointsPerSelector(s *metav1.LabelSelector) (map[string][]invv1alpha1.Endpoint, error) {
+func (r *Endpoints) GetSelectorEndpoints(s *metav1.LabelSelector) (map[string][]invv1alpha1.Endpoint, error) {
 	selector, err := metav1.LabelSelectorAsSelector(s)
 	if err != nil {
 		return nil, err

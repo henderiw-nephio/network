@@ -14,26 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package network
+package endpoints
 
 import (
+	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type nodes struct {
-	*invv1alpha1.NodeList
-}
-
-func (r *nodes) iterator() *iterator[invv1alpha1.Node] {
-	return &iterator[invv1alpha1.Node]{curIdx: -1, items: r.Items}
-}
-
-func (r *nodes) GetNodes() []invv1alpha1.Node {
-	nodes := []invv1alpha1.Node{}
-
-	iter := r.iterator()
-	for iter.HasNext() {
-		nodes = append(nodes, iter.Value())
+func GetSelector(itfce infrav1alpha1.Interface) *metav1.LabelSelector {
+	selector := &metav1.LabelSelector{}
+	if itfce.Selector != nil {
+		selector = itfce.Selector
+	} else {
+		// we assume the validation happend here that interfaceName and NodeName are not nil
+		selector = &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				invv1alpha1.NephioInterfaceNameKey: *itfce.InterfaceName,
+				invv1alpha1.NephioNodeNameKey:      *itfce.NodeName,
+			},
+		}
 	}
-	return nodes
+	return selector
 }

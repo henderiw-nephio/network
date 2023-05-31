@@ -14,18 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package network
+package endpoints
 
-// getSelectorLabels return the labels of the real data endpoint
-// based on the leys we used to select the endpoints
-func getSelectorLabels(labels map[string]string, keys []string) map[string]string {
-	selectorLabels := map[string]string{}
-	for k, v := range labels {
-		for _, key := range keys {
-			if k == key {
-				selectorLabels[k] = v
-			}
-		}
-	}
-	return selectorLabels
+type iterator[T any] struct {
+	curIdx int
+	items  []T
+}
+
+func (r *iterator[T]) HasNext() bool {
+	r.curIdx++
+	return r.curIdx < len(r.items)
+}
+
+func (r *iterator[T]) Value() T {
+	return r.items[r.curIdx]
 }
