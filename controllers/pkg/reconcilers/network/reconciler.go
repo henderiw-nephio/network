@@ -52,6 +52,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 func init() {
@@ -114,6 +115,15 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 		Owns(&ipamv1alpha1.NetworkInstance{}).
 		Owns(&vlanv1alpha1.VLANDatabase{}).
 		Owns(&configv1alpha1.Network{}).
+		//Watches(&source.Kind{Type: &invv1alpha1.Link{}}, linkhandler).
+		Watches(&source.Kind{Type: &invv1alpha1.Endpoint{}}, &EnqueueRequestForAllEndpoints{
+			client: mgr.GetClient(),
+			ctx:    ctx,
+		}).
+		Watches(&source.Kind{Type: &invv1alpha1.Node{}}, &EnqueueRequestForAllNodes{
+			client: mgr.GetClient(),
+			ctx:    ctx,
+		}).
 		Complete(r)
 }
 
