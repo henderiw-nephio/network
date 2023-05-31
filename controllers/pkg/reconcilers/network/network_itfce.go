@@ -32,6 +32,7 @@ import (
 	"github.com/nokia/k8s-ipam/pkg/iputil"
 	"github.com/nokia/k8s-ipam/pkg/utils/util"
 	"github.com/openconfig/ygot/ygot"
+	"github.com/pkg/errors"
 	"github.com/srl-labs/ygotsrl/v22"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +40,7 @@ import (
 )
 
 const (
-	irbInterfaceName = "irb0"
+	irbInterfaceName    = "irb0"
 	systemInterfaceName = "system0"
 )
 
@@ -62,7 +63,8 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, cr *infrav1alpha1
 			vlanv1alpha1.VLANAllocationStatus{},
 		), nil)
 		if err != nil {
-			return err
+			msg := fmt.Sprintf("cannot claim vlan for cr: %s, bridge domain: %s", cr.GetName(), bdName)
+			return errors.Wrap(err, msg)
 		}
 		vlanId = *vlanAlloc.Status.VLANID
 	}
@@ -84,7 +86,7 @@ func (r *network) PopulateBridgeInterface(ctx context.Context, cr *infrav1alpha1
 			},
 		}
 	}
-	
+
 	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
 	ni.GetOrCreateInterface(niItfceSubItfceName)
@@ -110,7 +112,8 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 			vlanv1alpha1.VLANAllocationStatus{},
 		), nil)
 		if err != nil {
-			return err
+			msg := fmt.Sprintf("cannot claim vlan for cr: %s, routing instance: %s", cr.GetName(), rtName)
+			return errors.Wrap(err, msg)
 		}
 		vlanId = *vlanAlloc.Status.VLANID
 	}
@@ -189,7 +192,8 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 				ipamv1alpha1.IPAllocationStatus{},
 			), nil)
 			if err != nil {
-				return err
+				msg := fmt.Sprintf("cannot claim ip prefix for cr: %s, link: %s", cr.GetName(), prefixName)
+				return errors.Wrap(err, msg)
 			}
 
 			addressSelectorLabels := map[string]string{
@@ -221,7 +225,8 @@ func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1
 				ipamv1alpha1.IPAllocationStatus{},
 			), nil)
 			if err != nil {
-				return err
+				msg := fmt.Sprintf("cannot claim ip adrress for cr: %s, ep: %s", cr.GetName(), fmt.Sprintf("%s-%s", prefixName, nodeName))
+				return errors.Wrap(err, msg)
 			}
 			if pi.IsIpv6() {
 				ipv6 := si.GetOrCreateIpv6()
@@ -311,7 +316,8 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 					ipamv1alpha1.IPAllocationStatus{},
 				), nil)
 				if err != nil {
-					return err
+					msg := fmt.Sprintf("cannot claim ip prefix for irb: %s, link: %s", cr.GetName(), prefixName)
+					return errors.Wrap(err, msg)
 				}
 				// for network based prefixes i will allocate a gateway IP
 				if prefixKind == ipamv1alpha1.PrefixKindNetwork {
@@ -345,7 +351,8 @@ func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Ne
 						ipamv1alpha1.IPAllocationStatus{},
 					), nil)
 					if err != nil {
-						return err
+						msg := fmt.Sprintf("cannot claim ip adrress for cr: %s, ep: %s", cr.GetName(), fmt.Sprintf("%s-gateway", prefixName))
+						return errors.Wrap(err, msg)
 					}
 					if pi.IsIpv6() {
 						ipv6 := si.GetOrCreateIpv6()

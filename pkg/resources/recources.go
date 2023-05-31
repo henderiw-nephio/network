@@ -29,7 +29,7 @@ import (
 )
 
 type Resources interface {
-	AddNewResource(ref corev1.ObjectReference, o client.Object)
+	AddNewResource(o client.Object)
 	GetExistingResources(ctx context.Context) error
 	APIApply(ctx context.Context) error
 }
@@ -57,10 +57,15 @@ type resources struct {
 	existingResources map[corev1.ObjectReference]client.Object
 }
 
-func (r *resources) AddNewResource(ref corev1.ObjectReference, o client.Object) {
+func (r *resources) AddNewResource(o client.Object) {
 	r.m.Lock()
 	defer r.m.Unlock()
-	r.newResources[ref] = o
+	r.newResources[corev1.ObjectReference{
+		APIVersion: o.GetResourceVersion(),
+		Kind:       o.GetObjectKind().GroupVersionKind().Kind,
+		Namespace:  o.GetNamespace(),
+		Name:       o.GetName(),
+	}] = o
 }
 
 func (r *resources) GetExistingResources(ctx context.Context) error {

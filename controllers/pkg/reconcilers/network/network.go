@@ -21,71 +21,48 @@ import (
 	"fmt"
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	"github.com/henderiw-nephio/network/pkg/endpoints"
+	"github.com/henderiw-nephio/network/pkg/ipam"
+	"github.com/henderiw-nephio/network/pkg/nodes"
 	"github.com/henderiw-nephio/network/pkg/resources"
+	"github.com/henderiw-nephio/network/pkg/vlan"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
-	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
-	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
-	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/hash"
-	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	"github.com/pkg/errors"
 
 	//"github.com/nokia/k8s-ipam/pkg/resource"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	"github.com/srl-labs/ygotsrl/v22"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	defaultNetworkName = "default"
 )
 
 type network struct {
 	resource.APIPatchingApplicator
-	apply           bool
-	devices         map[string]*ygotsrl.Device
-	resources       resources.Resources
-	eps             *endpoints
-	nodes           *nodes
-	hash            hash.HashTable
-	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
-	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]
+	apply     bool
+	devices   map[string]*ygotsrl.Device
+	resources resources.Resources
+	eps       *endpoints.Endpoints
+	nodes     *nodes.Nodes
+	hash      hash.HashTable
+	ipam      ipam.IPAM
+	vlan      vlan.VLAN
 }
 
-func (r *network) populateIPAMNetworkInstance(rt infrav1alpha1.RoutingTable, cr *infrav1alpha1.Network) client.Object {
+func (r *network) populateIPAMNetworkInstance(cr *infrav1alpha1.Network, rt infrav1alpha1.RoutingTable) client.Object {
 	// create IPAM NetworkInstance
-	o := ipamv1alpha1.BuildNetworkInstance(
-		metav1.ObjectMeta{
-			Name:            rt.Name,
-			Namespace:       cr.Namespace,
-			Labels:          getMatchingLabels(cr),
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
-		}, ipamv1alpha1.NetworkInstanceSpec{
-			Prefixes: rt.Prefixes,
-		}, ipamv1alpha1.NetworkInstanceStatus{})
-	r.resources.AddNewResource(
-		corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace},
-		o,
-	)
+	o := r.ipam.ClaimIPAMDB(cr, rt.Name, rt.Prefixes)
+	r.resources.AddNewResource(o)
 	return o
 }
 
-func (r *network) populateVlanDatabase(selectorName string, cr *infrav1alpha1.Network) client.Object {
+func (r *network) populateVlanDatabase(cr *infrav1alpha1.Network, dbIndexName string) client.Object {
 	// create VLAN DataBase
-	o := vlanv1alpha1.BuildVLANDatabase(
-		metav1.ObjectMeta{
-			Name:            selectorName, // the vlan db is always the selectorName since the bd is physical and not virtual
-			Namespace:       cr.Namespace,
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.APIVersion, Kind: cr.Kind, Name: cr.Name, UID: cr.UID, Controller: pointer.Bool(true)}},
-		},
-		vlanv1alpha1.VLANDatabaseSpec{
-			Kind: vlanv1alpha1.VLANDBKindESG,
-		},
-		vlanv1alpha1.VLANDatabaseStatus{},
-	)
-	r.resources.AddNewResource(
-		corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace},
-		o,
-	)
+	o := r.vlan.ClaimVLANDB(cr, dbIndexName)
+	r.resources.AddNewResource(o)
 	return o
 }
 
@@ -95,33 +72,28 @@ func (r *network) PopulateBridgeDomains(ctx context.Context, cr *infrav1alpha1.N
 		// it ensure we dont duplicate allocations, etc etc
 		tr := NewTracker()
 		for _, itfce := range bd.Interfaces {
-			selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
+			// GetSelectorEndpoints returns a map with key = selectorName and value list of endpoints
+			// associated to that selector
+			// A selectorName can be a grouping like a cluster or a nodeName/InterfaceName
+			selectedEndpoints, err := r.eps.GetSelectorEndpoints(endpoints.GetSelector(itfce))
 			if err != nil {
-				return err
+				msg := fmt.Sprintf("cannot get endpoints from selector: %v", endpoints.GetSelector(itfce))
+				return errors.Wrap(err, msg)
 			}
 			for selectorName, eps := range selectedEndpoints {
 				for _, ep := range eps {
 					if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
 						// selectorName is a global unique identity (interface/node or a grouping like clusters)
-						bdName := fmt.Sprintf("%s-bd", bd.Name)
-						if itfce.Selector != nil {
-							bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
-						}
+						bdName := itfce.GetBridgeDomainName(bd.Name, selectorName)
 
 						// create a VLANDatabase (based on selectorName)
 						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-							o := r.populateVlanDatabase(selectorName, cr)
-							if r.apply {
-								if err := r.Apply(ctx, o); err != nil {
-									return err
-								}
-								// we can continue here since we do another stage
-								continue
-							}
-						} else {
-							if r.apply {
-								continue
-							}
+							r.populateVlanDatabase(cr, selectorName)
+						}
+						// we dont proceed if we need to apply the databases first, since they are used
+						// as an index to allocate resources from
+						if r.apply {
+							continue
 						}
 
 						// create bridgedomain (bdname) + create a bd index
@@ -138,36 +110,18 @@ func (r *network) PopulateBridgeDomains(ctx context.Context, cr *infrav1alpha1.N
 	return nil
 }
 
-func getSelector(itfce infrav1alpha1.Interface) *metav1.LabelSelector {
-	selector := &metav1.LabelSelector{}
-	if itfce.Selector != nil {
-		selector = itfce.Selector
-	} else {
-		// we assume the validation happend here that interfaceName and NodeName are not nil
-		selector = &metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				invv1alpha1.NephioInterfaceNameKey: *itfce.InterfaceName,
-				invv1alpha1.NephioNodeNameKey:      *itfce.NodeName,
-			},
-		}
-	}
-	return selector
-}
-
 func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.Network) error {
 	for _, rt := range cr.Spec.RoutingTables {
-		o := r.populateIPAMNetworkInstance(rt, cr)
-		if r.apply {
-			if err := r.Apply(ctx, o); err != nil {
-				return err
-			}
-		}
+		r.populateIPAMNetworkInstance(cr, rt)
 
+		// we need to identify which nodes and interfaces belong to this routing table
 		for _, itfce := range rt.Interfaces {
 			if itfce.Kind == infrav1alpha1.InterfaceKindBridgeDomain {
 				// create IRB + we lookup the interfaces/selectors in the bridge domain
 				for _, bd := range cr.Spec.BridgeDomains {
 					if itfce.BridgeDomainName != nil && bd.Name == *itfce.BridgeDomainName {
+						// we dont proceed if we need to apply the databases first, since they are used
+						// as an index to allocate resources from
 						if r.apply {
 							continue
 						}
@@ -175,18 +129,17 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 						// it ensure we dont duplicate allocations, etc etc
 						tr := NewTracker()
 						for _, itfce := range bd.Interfaces {
-							selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
+							selectedEndpoints, err := r.eps.GetSelectorEndpoints(endpoints.GetSelector(itfce))
 							if err != nil {
-								return err
+								msg := fmt.Sprintf("cannot get endpoints from selector: %v", endpoints.GetSelector(itfce))
+								return errors.Wrap(err, msg)
 							}
 							for selectorName, eps := range selectedEndpoints {
 								for _, ep := range eps {
 									if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
 										rtName := rt.Name
-										bdName := fmt.Sprintf("%s-bd", bd.Name)
-										if itfce.Selector != nil {
-											bdName = fmt.Sprintf("%s-%s-bd", bd.Name, selectorName)
-										}
+										// selectorName is a global unique identity (interface/node or a grouping like clusters)
+										bdName := itfce.GetBridgeDomainName(bd.Name, selectorName)
 										// populate the bridge part
 										if err := r.PopulateIRBInterface(ctx, cr, false, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
 											return err
@@ -209,7 +162,7 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 			// it ensure we dont duplicate allocations, etc etc
 			tr := NewTracker()
 
-			selectedEndpoints, err := r.eps.GetEndpointsPerSelector(getSelector(itfce))
+			selectedEndpoints, err := r.eps.GetSelectorEndpoints(endpoints.GetSelector(itfce))
 			if err != nil {
 				return err
 			}
@@ -219,19 +172,12 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 					if !tr.IsAlreadyDone(ep.Spec.NodeName, ep.Spec.InterfaceName) {
 
 						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-							o := r.populateVlanDatabase(selectorName, cr)
-							if r.apply {
-								if err := r.Apply(ctx, o); err != nil {
-									return err
-								}
-								// we can return here since we do another stage
-								continue
-							}
-						} else {
-							if r.apply {
-								// we can return here since we do another stage
-								continue
-							}
+							r.populateVlanDatabase(cr, selectorName)
+
+						}
+						if r.apply {
+							// we can return here since we do another stage
+							continue
 						}
 
 						r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
@@ -249,9 +195,8 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 
 func (r *network) PopulateDefault(ctx context.Context, cr *infrav1alpha1.Network) error {
 	for _, rt := range cr.Spec.RoutingTables {
-		if rt.Name == "default" {
+		if rt.Name == defaultNetworkName {
 			for _, node := range r.nodes.GetNodes() {
-				fmt.Println("populate default node: ", node.Name)
 				if err := r.PopulateNode(ctx, cr, node.Name, rt.Name, rt.Prefixes); err != nil {
 					return errors.Wrap(err, "cannot populate node")
 				}
