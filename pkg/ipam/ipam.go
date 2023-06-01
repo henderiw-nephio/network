@@ -31,7 +31,7 @@ import (
 
 type IPAM interface {
 	ClaimIPAMDB(cr client.Object, dbIndexName string, prefixes []ipamv1alpha1.Prefix) *ipamv1alpha1.NetworkInstance
-	ClaimIPPrefix(ctx context.Context, cr client.Object, dbIndexName, claimName string, prefixLength int, udl, sel map[string]string) (*string, error)
+	ClaimIPPrefix(ctx context.Context, cr client.Object, dbIndexName, claimName string, prefixLength uint8, udl, sel map[string]string) (*string, error)
 	ClaimIPAddress(ctx context.Context, cr client.Object, dbIndexName, claimName string, udl, sel map[string]string) (*string, error)
 }
 
@@ -57,7 +57,7 @@ func (r *ipam) ClaimIPAMDB(cr client.Object, dbIndexName string, prefixes []ipam
 		}, ipamv1alpha1.NetworkInstanceStatus{})
 }
 
-func (r *ipam) ClaimIPPrefix(ctx context.Context, cr client.Object, dbIndexName, claimName string, prefixLength int, udl, sel map[string]string) (*string, error) {
+func (r *ipam) ClaimIPPrefix(ctx context.Context, cr client.Object, dbIndexName, claimName string, prefixLength uint8, udl, sel map[string]string) (*string, error) {
 	prefix, err := r.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
 		metav1.ObjectMeta{
 			Name:      claimName,
@@ -67,7 +67,7 @@ func (r *ipam) ClaimIPPrefix(ctx context.Context, cr client.Object, dbIndexName,
 			Kind:            ipamv1alpha1.PrefixKindNetwork,
 			NetworkInstance: corev1.ObjectReference{Name: dbIndexName, Namespace: cr.GetNamespace()},
 			//AddressFamily:   &af,
-			PrefixLength: util.PointerUint8(prefixLength),
+			PrefixLength: util.PointerUint8(int(prefixLength)),
 			CreatePrefix: pointer.Bool(true),
 			AllocationLabels: allocv1alpha1.AllocationLabels{
 				UserDefinedLabels: allocv1alpha1.UserDefinedLabels{

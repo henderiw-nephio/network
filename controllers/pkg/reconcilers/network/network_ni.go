@@ -25,15 +25,13 @@ import (
 
 // create a BridgeDomain (bdName + "-" + selectorName)
 // create BD Index (hash)
-func (r *network) PopulateBridgeDomain(ctx context.Context, nodeName, selectorName, bdName string) {
+func (r *network) AddBridgeDomain(ctx context.Context, nodeName, selectorName, bdName string) {
 	// get device context
-	if _, ok := r.devices[nodeName]; !ok {
-		r.devices[nodeName] = new(ygotsrl.Device)
-	}
+	d := r.getDevice(nodeName)
 
 	// create ni Intstance and interfaces
 	//bdIndex := r.hash.Insert(bdName, "dummy", map[string]string{})
-	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
+	ni := d.GetOrCreateNetworkInstance(bdName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
 	ni.BridgeTable = &ygotsrl.SrlNokiaNetworkInstance_NetworkInstance_BridgeTable{
 		MacLearning: &ygotsrl.SrlNokiaNetworkInstance_NetworkInstance_BridgeTable_MacLearning{
@@ -58,12 +56,11 @@ func (r *network) PopulateBridgeDomain(ctx context.Context, nodeName, selectorNa
 	//return
 }
 
-func (r *network) PopulateRoutingInstance(ctx context.Context, nodeName, selectorName, rtName string) {
-	if _, ok := r.devices[nodeName]; !ok {
-		r.devices[nodeName] = new(ygotsrl.Device)
-	}
+func (r *network) AddRoutingInstance(ctx context.Context, nodeName, selectorName, rtName string) {
+	// get device context
+	d := r.getDevice(nodeName)
 
-	ni := r.devices[nodeName].GetOrCreateNetworkInstance(rtName)
+	ni := d.GetOrCreateNetworkInstance(rtName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
 	if rtName == "default" {
 		ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_default

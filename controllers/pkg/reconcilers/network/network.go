@@ -21,17 +21,16 @@ import (
 	"fmt"
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	"github.com/henderiw-nephio/network/pkg/device"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	"github.com/henderiw-nephio/network/pkg/ipam"
 	"github.com/henderiw-nephio/network/pkg/nodes"
 	"github.com/henderiw-nephio/network/pkg/resources"
 	"github.com/henderiw-nephio/network/pkg/vlan"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
+	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/pkg/errors"
-
-	//"github.com/nokia/k8s-ipam/pkg/resource"
-	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	"github.com/srl-labs/ygotsrl/v22"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,6 +40,7 @@ const (
 )
 
 type network struct {
+	config *infrav1alpha1.NetworkConfigSpec
 	resource.APIPatchingApplicator
 	apply     bool
 	devices   map[string]*ygotsrl.Device
@@ -52,21 +52,21 @@ type network struct {
 	vlan      vlan.VLAN
 }
 
-func (r *network) populateIPAMNetworkInstance(cr *infrav1alpha1.Network, rt infrav1alpha1.RoutingTable) client.Object {
+func (r *network) addIPAMNetworkInstance(cr *infrav1alpha1.Network, rt infrav1alpha1.RoutingTable) client.Object {
 	// create IPAM NetworkInstance
 	o := r.ipam.ClaimIPAMDB(cr, rt.Name, rt.Prefixes)
 	r.resources.AddNewResource(o)
 	return o
 }
 
-func (r *network) populateVlanDatabase(cr *infrav1alpha1.Network, dbIndexName string) client.Object {
+func (r *network) addVlanDatabase(cr *infrav1alpha1.Network, dbIndexName string) client.Object {
 	// create VLAN DataBase
 	o := r.vlan.ClaimVLANDB(cr, dbIndexName)
 	r.resources.AddNewResource(o)
 	return o
 }
 
-func (r *network) PopulateBridgeDomains(ctx context.Context, cr *infrav1alpha1.Network) error {
+func (r *network) AddBridgeDomains(ctx context.Context, cr *infrav1alpha1.Network) error {
 	for _, bd := range cr.Spec.BridgeDomains {
 		// tracker tracks if we already initialized the context
 		// it ensure we dont duplicate allocations, etc etc
@@ -88,7 +88,7 @@ func (r *network) PopulateBridgeDomains(ctx context.Context, cr *infrav1alpha1.N
 
 						// create a VLANDatabase (based on selectorName)
 						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-							r.populateVlanDatabase(cr, selectorName)
+							r.addVlanDatabase(cr, selectorName)
 						}
 						// we dont proceed if we need to apply the databases first, since they are used
 						// as an index to allocate resources from
@@ -97,9 +97,18 @@ func (r *network) PopulateBridgeDomains(ctx context.Context, cr *infrav1alpha1.N
 						}
 
 						// create bridgedomain (bdname) + create a bd index
-						r.PopulateBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
+						r.AddBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)
 						// create interface/subinterface + networkInstance interface
-						if err := r.PopulateBridgeInterface(ctx, cr, selectorName, bdName, ep, itfce.AttachmentType); err != nil {
+						if err := r.AddBridgeInterface(ctx, cr, &ifceContext{
+							nodeName:       ep.Spec.NodeName,
+							ifName:         ep.Spec.InterfaceName,
+							linkName:       ep.GetLinkName(),
+							interfaceType:  interfaceTypeRegular,
+							interfaceKind:  infrav1alpha1.InterfaceUsageKindExternal,
+							vlanDBIndex:    selectorName,
+							niName:         bdName,
+							attachmentType: itfce.AttachmentType,
+						}); err != nil {
 							return err
 						}
 					}
@@ -110,9 +119,9 @@ func (r *network) PopulateBridgeDomains(ctx context.Context, cr *infrav1alpha1.N
 	return nil
 }
 
-func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.Network) error {
+func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Network) error {
 	for _, rt := range cr.Spec.RoutingTables {
-		r.populateIPAMNetworkInstance(cr, rt)
+		r.addIPAMNetworkInstance(cr, rt)
 
 		// we need to identify which nodes and interfaces belong to this routing table
 		for _, itfce := range rt.Interfaces {
@@ -141,12 +150,25 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 										// selectorName is a global unique identity (interface/node or a grouping like clusters)
 										bdName := itfce.GetBridgeDomainName(bd.Name, selectorName)
 										// populate the bridge part
-										if err := r.PopulateIRBInterface(ctx, cr, false, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
-											return err
+										ifctx := &ifceContext{
+											nodeName:       ep.Spec.NodeName,
+											ifName:         device.IRBInterfaceName,
+											linkName:       ep.GetLinkName(),
+											interfaceType:  interfaceTypeIRB,
+											interfaceKind:  infrav1alpha1.InterfaceUsageKindExternal,
+											vlanDBIndex:    selectorName,
+											bdName:         bdName,
+											niName:         rtName,
+											attachmentType: itfce.AttachmentType,
+										}
+										if err := r.AddIRBBridgeInterface(ctx, cr, ifctx); err != nil {
+											msg := fmt.Sprintf("cannot add irb bridged interface in rt: %s", rt.Name)
+											return errors.Wrap(err, msg)
 										}
 										// populate the routed part
-										if err := r.PopulateIRBInterface(ctx, cr, true, bdName, rtName, ep, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
-											return err
+										if err := r.AddIRBRoutedInterface(ctx, cr, ifctx, rt.Prefixes, map[string]string{}); err != nil {
+											msg := fmt.Sprintf("cannot add irb routed interface in rt: %s", rt.Name)
+											return errors.Wrap(err, msg)
 										}
 									}
 								}
@@ -172,18 +194,28 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 					if !tr.IsAlreadyDone(ep.Spec.NodeName, ep.Spec.InterfaceName) {
 
 						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-							r.populateVlanDatabase(cr, selectorName)
+							r.addVlanDatabase(cr, selectorName)
 
 						}
 						if r.apply {
 							// we can return here since we do another stage
 							continue
 						}
-
-						r.PopulateRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
+						r.AddRoutingInstance(ctx, ep.Spec.NodeName, selectorName, rtName)
 						// create interface/subinterface + networkInstance interface +
-						if err := r.PopulateRoutedInterface(ctx, cr, selectorName, rtName, ep, itfce.AttachmentType, rt.Prefixes, getSelectorLabels(ep.Labels, getKeys(getSelector(itfce)))); err != nil {
-							return err
+
+						if err := r.AddRoutedInterface(ctx, cr, &ifceContext{
+							nodeName:       ep.Spec.NodeName,
+							ifName:         ep.Spec.InterfaceName,
+							linkName:       ep.GetLinkName(),
+							interfaceType:  interfaceTypeRegular,
+							interfaceKind:  infrav1alpha1.InterfaceUsageKindExternal,
+							vlanDBIndex:    selectorName,
+							niName:         rtName,
+							attachmentType: itfce.AttachmentType,
+						}, rt.Prefixes, map[string]string{}); err != nil {
+							msg := fmt.Sprintf("cannot add routed interface in rt: %s", rt.Name)
+							return errors.Wrap(err, msg)
 						}
 					}
 				}
@@ -193,12 +225,18 @@ func (r *network) PopulateRoutingTables(ctx context.Context, cr *infrav1alpha1.N
 	return nil
 }
 
-func (r *network) PopulateDefault(ctx context.Context, cr *infrav1alpha1.Network) error {
+func (r *network) AddDefaultNodeConfig(ctx context.Context, cr *infrav1alpha1.Network) error {
 	for _, rt := range cr.Spec.RoutingTables {
 		if rt.Name == defaultNetworkName {
 			for _, node := range r.nodes.GetNodes() {
-				if err := r.PopulateNode(ctx, cr, node.Name, rt.Name, rt.Prefixes); err != nil {
-					return errors.Wrap(err, "cannot populate node")
+				if err := r.AddNodeConfig(ctx, cr, &ifceContext{
+					nodeName:      node.Name,
+					ifName:        device.SystemInterfaceName,
+					interfaceType: interfaceTypeRegular,
+					interfaceKind: infrav1alpha1.InterfaceUsageKindInternal,
+					niName:        rt.Name,
+				}, rt.Prefixes); err != nil {
+					return errors.Wrap(err, "cannot populate node config")
 				}
 			}
 		}

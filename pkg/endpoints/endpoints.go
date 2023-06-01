@@ -29,7 +29,7 @@ type Endpoints struct {
 	*invv1alpha1.EndpointList
 }
 
-func getKeys(s *metav1.LabelSelector) []string {
+func GetKeys(s *metav1.LabelSelector) []string {
 	keys := []string{}
 	for k := range s.MatchLabels {
 		keys = append(keys, k)
@@ -102,7 +102,7 @@ func (r *Endpoints) GetSelectorEndpoints(s *metav1.LabelSelector) (map[string][]
 	if err != nil {
 		return nil, err
 	}
-	keys := getKeys(s)
+	keys := GetKeys(s)
 	epPerSelector := map[string][]invv1alpha1.Endpoint{}
 
 	iter := r.iterator()

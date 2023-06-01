@@ -20,371 +20,171 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
-	"strconv"
-	"strings"
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	"github.com/henderiw-nephio/network/pkg/device"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
-	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
-	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/iputil"
-	"github.com/nokia/k8s-ipam/pkg/utils/util"
-	"github.com/openconfig/ygot/ygot"
 	"github.com/pkg/errors"
 	"github.com/srl-labs/ygotsrl/v22"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 )
+
+// special case - in irb routed
+// prefixName is based on bdName
+// NetworkInstance is based on rtName
+
+type interfaceType string
 
 const (
-	irbInterfaceName    = "irb0"
-	systemInterfaceName = "system0"
+	interfaceTypeIRB     interfaceType = "irb"
+	interfaceTypeRegular interfaceType = "regular"
 )
 
-func (r *network) PopulateBridgeInterface(ctx context.Context, cr *infrav1alpha1.Network, selectorName, bdName string, ep invv1alpha1.Endpoint, attachmentType reqv1alpha1.AttachmentType) error {
-	nodeName := ep.Spec.NodeName
-	if _, ok := r.devices[nodeName]; !ok {
-		r.devices[nodeName] = new(ygotsrl.Device)
-	}
-
-	vlanId := uint16(0)
-	if attachmentType == reqv1alpha1.AttachmentTypeVLAN {
-		vlanAlloc, err := r.VlanClientProxy.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
-			metav1.ObjectMeta{
-				Name:      bdName,
-				Namespace: cr.Namespace,
-			},
-			vlanv1alpha1.VLANAllocationSpec{
-				VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: cr.Namespace},
-			},
-			vlanv1alpha1.VLANAllocationStatus{},
-		), nil)
-		if err != nil {
-			msg := fmt.Sprintf("cannot claim vlan for cr: %s, bridge domain: %s", cr.GetName(), bdName)
-			return errors.Wrap(err, msg)
-		}
-		vlanId = *vlanAlloc.Status.VLANID
-	}
-
-	ifName := strings.ReplaceAll(ep.Spec.InterfaceName, "-", "/")
-	ifName = strings.ReplaceAll(ifName, "e", "ethernet-")
-	niItfceSubItfceName := strings.Join([]string{ifName, strconv.Itoa(int(vlanId))}, ".")
-	i := r.devices[nodeName].GetOrCreateInterface(ifName)
-
-	si := i.GetOrCreateSubinterface(uint32(vlanId))
-	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_bridged
-	if attachmentType == reqv1alpha1.AttachmentTypeVLAN {
-		i.VlanTagging = ygot.Bool(true)
-		si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
-			Encap: &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan_Encap{
-				SingleTagged: &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan_Encap_SingleTagged{
-					VlanId: ygotsrl.UnionUint16(vlanId),
-				},
-			},
-		}
-	}
-
-	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
-	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
-	ni.GetOrCreateInterface(niItfceSubItfceName)
-	return nil
+type ifceContext struct {
+	nodeName       string
+	ifName         string
+	interfaceType  interfaceType // "irb or "regular"
+	interfaceKind  infrav1alpha1.InterfaceUsageKind
+	linkName       string // ep.GetLinkName(int(vlanId))
+	vlanDBIndex    string // name of node/itfce or selectorName (e.g. cluster)
+	bdName         string // only used in routed IRB - used to calculate the index matching the bdName
+	niName         string // generic name for network instance can be rt or bd
+	attachmentType reqv1alpha1.AttachmentType
 }
 
-func (r *network) PopulateRoutedInterface(ctx context.Context, cr *infrav1alpha1.Network, selectorName, rtName string, ep invv1alpha1.Endpoint, attachmentType reqv1alpha1.AttachmentType, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
-	nodeName := ep.Spec.NodeName
+func (r *network) getDevice(nodeName string) *device.Device {
 	if _, ok := r.devices[nodeName]; !ok {
 		r.devices[nodeName] = new(ygotsrl.Device)
 	}
+	return &device.Device{Device: r.devices[nodeName]}
+}
+
+func (r *network) getVLANID(ctx context.Context, cr *infrav1alpha1.Network, ifCtxt *ifceContext) (uint16, error) {
 	vlanId := uint16(0)
-	if attachmentType == reqv1alpha1.AttachmentTypeVLAN {
-		// allocate vlanID -> vlanDatabase = selectorName, allocName = bdName or rtName
-		vlanAlloc, err := r.VlanClientProxy.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
-			metav1.ObjectMeta{
-				Name:      rtName,
-				Namespace: cr.Namespace,
-			},
-			vlanv1alpha1.VLANAllocationSpec{
-				VLANDatabase: corev1.ObjectReference{Name: selectorName, Namespace: cr.Namespace},
-			},
-			vlanv1alpha1.VLANAllocationStatus{},
-		), nil)
+	if ifCtxt.attachmentType == reqv1alpha1.AttachmentTypeVLAN {
+		vlanID, err := r.vlan.ClaimVLANID(ctx, cr, ifCtxt.vlanDBIndex, ifCtxt.niName)
 		if err != nil {
-			msg := fmt.Sprintf("cannot claim vlan for cr: %s, routing instance: %s", cr.GetName(), rtName)
-			return errors.Wrap(err, msg)
+			msg := fmt.Sprintf("cannot claim vlan for cr: %s, niName: %s", cr.GetName(), ifCtxt.niName)
+			return 0, errors.Wrap(err, msg)
 		}
-		vlanId = *vlanAlloc.Status.VLANID
+		vlanId = *vlanID
 	}
+	return vlanId, nil
+}
 
-	LinkName := fmt.Sprintf("%s-%d", ep.Labels[invv1alpha1.NephioLinkNameKey], vlanId)
-	ifName := strings.ReplaceAll(ep.Spec.InterfaceName, "-", "/")
-	ifName = strings.ReplaceAll(ifName, "e", "ethernet-")
-	niItfceSubItfceName := strings.Join([]string{ifName, strconv.Itoa(int(vlanId))}, ".")
-	i := r.devices[nodeName].GetOrCreateInterface(ifName)
-
-	si := i.GetOrCreateSubinterface(uint32(vlanId))
-	si.Type = ygotsrl.SrlNokiaInterfaces_SiType_routed
-
-	if attachmentType == reqv1alpha1.AttachmentTypeVLAN {
-		i.VlanTagging = ygot.Bool(true)
-		si.Vlan = &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan{
-			Encap: &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan_Encap{
-				SingleTagged: &ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Vlan_Encap_SingleTagged{
-					VlanId: ygotsrl.UnionUint16(vlanId),
-				},
-			},
-		}
-	}
-
+func (r *network) getLinkPrefixes(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext, prefixes []ipamv1alpha1.Prefix, labels map[string]string) (iputil.PrefixClaims, error) {
+	prefixClaims := iputil.PrefixClaims{}
 	for _, prefix := range prefixes {
-		pi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
+		if prefix.GetPrefixKind() == ipamv1alpha1.PrefixKindNetwork {
+			pi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
+			prefixLength := r.config.GetInterfacePrefixLength(ifctx.interfaceKind, pi.IsIpv6())
 
-		prefixKind := ipamv1alpha1.PrefixKindNetwork
-		if value, ok := prefix.Labels[allocv1alpha1.NephioPrefixKindKey]; ok {
-			prefixKind = ipamv1alpha1.GetPrefixKindFromString(value)
-		}
-
-		if prefixKind == ipamv1alpha1.PrefixKindNetwork {
-			prefixLength := 64
-			if pi.IsIpv4() {
-				prefixLength = 24
+			// special case - in irb routed
+			// prefixName is based on bdName
+			// NetworkInstance is based on rtName
+			niName := ifctx.niName
+			linkName := ifctx.linkName
+			nodeName := ifctx.nodeName
+			if ifctx.interfaceType == interfaceTypeIRB {
+				niName = ifctx.bdName
+				linkName = "irb"
+				nodeName = "gateway"
 			}
-			if rtName == "default" {
-				prefixLength = 127
-				if pi.IsIpv4() {
-					prefixLength = 31
-				}
-			}
-			af := pi.GetAddressFamily()
+			prefixClaimCtx := prefix.GetPrefixClaimContext(niName, linkName, nodeName, cr.Namespace, labels)
 
-			// add the prefix labels to the prefix selector labels
-			prefixSelectorLabels := map[string]string{
-				allocv1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
-				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
-			}
-
-			labels[allocv1alpha1.NephioPurposeKey] = "link prefix"
-
-			// allocate link prefix
-			prefixName := fmt.Sprintf("%s-%s", ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()), LinkName)
-			_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
-				metav1.ObjectMeta{
-					Name:      prefixName,
-					Namespace: cr.Namespace,
-				},
-				ipamv1alpha1.IPAllocationSpec{
-					Kind:            ipamv1alpha1.PrefixKindNetwork,
-					NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
-					AddressFamily:   &af,
-					PrefixLength:    util.PointerUint8(prefixLength),
-					CreatePrefix:    pointer.Bool(true),
-					AllocationLabels: allocv1alpha1.AllocationLabels{
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-							Labels: labels,
-						},
-						Selector: &metav1.LabelSelector{
-							MatchLabels: prefixSelectorLabels,
-						},
-					},
-				},
-				ipamv1alpha1.IPAllocationStatus{},
-			), nil)
+			_, err := r.ipam.ClaimIPPrefix(ctx, cr, ifctx.niName, prefixClaimCtx.PrefixClaimName, prefixLength, prefixClaimCtx.PrefixUserDefinedLabels, prefixClaimCtx.PrefixSelectorLabels)
 			if err != nil {
-				msg := fmt.Sprintf("cannot claim ip prefix for cr: %s, link: %s", cr.GetName(), prefixName)
-				return errors.Wrap(err, msg)
+				msg := fmt.Sprintf("cannot claim ip prefix for cr: %s, link: %s", cr.GetName(), prefixClaimCtx.PrefixClaimName)
+				return nil, errors.Wrap(err, msg)
 			}
 
-			addressSelectorLabels := map[string]string{
-				allocv1alpha1.NephioNsnNameKey:      prefixName,
-				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
-			}
-
-			prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
-				metav1.ObjectMeta{
-					Name:      fmt.Sprintf("%s-%s", prefixName, nodeName),
-					Namespace: cr.Namespace,
-				},
-				ipamv1alpha1.IPAllocationSpec{
-					Kind:            ipamv1alpha1.PrefixKindNetwork,
-					NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
-					AddressFamily:   &af,
-					AllocationLabels: allocv1alpha1.AllocationLabels{
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-							Labels: map[string]string{
-								allocv1alpha1.NephioGatewayKey: "true",
-								allocv1alpha1.NephioPurposeKey: "link endpoint address",
-							},
-						},
-						Selector: &metav1.LabelSelector{
-							MatchLabels: addressSelectorLabels,
-						},
-					},
-				},
-				ipamv1alpha1.IPAllocationStatus{},
-			), nil)
+			addressPrefix, err := r.ipam.ClaimIPAddress(ctx, cr, ifctx.niName, prefixClaimCtx.AddressClaimName, prefixClaimCtx.AddressUserDefinedLabels, prefixClaimCtx.AddressSelectorLabels)
 			if err != nil {
-				msg := fmt.Sprintf("cannot claim ip adrress for cr: %s, ep: %s", cr.GetName(), fmt.Sprintf("%s-%s", prefixName, nodeName))
-				return errors.Wrap(err, msg)
+				msg := fmt.Sprintf("cannot claim ip adrress for cr: %s, ep: %s", cr.GetName(), prefixClaimCtx.AddressClaimName)
+				return nil, errors.Wrap(err, msg)
 			}
-			if pi.IsIpv6() {
-				ipv6 := si.GetOrCreateIpv6()
-				ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
-					IpPrefix: prefixAlloc.Status.Prefix,
-				})
-			} else {
-				ipv4 := si.GetOrCreateIpv4()
-				ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
-					IpPrefix: prefixAlloc.Status.Prefix,
-				})
-			}
+			prefixClaims.AddPrefix(iputil.IsIPv6(pi.IsIpv6()), addressPrefix)
 		}
 	}
+	return prefixClaims, nil
+}
 
-	ni := r.devices[nodeName].GetOrCreateNetworkInstance(rtName)
-	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
-	ni.GetOrCreateInterface(niItfceSubItfceName)
+func (r *network) getLoopbackPrefixes(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext, prefixes []ipamv1alpha1.Prefix) (iputil.PrefixClaims, error) {
+	prefixClaims := iputil.PrefixClaims{}
+	for _, prefix := range prefixes {
+		if prefix.GetPrefixKind() == ipamv1alpha1.PrefixKindLoopback {
+			pi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
+			addressClaimCxt := prefix.GetAddressClaimContext(ifctx.niName, ifctx.nodeName, cr.Namespace, map[string]string{})
+
+			addressPrefix, err := r.ipam.ClaimIPAddress(ctx, cr, ifctx.niName, addressClaimCxt.AddressClaimName, addressClaimCxt.AddressUserDefinedLabels, addressClaimCxt.AddressSelectorLabels)
+			if err != nil {
+				msg := fmt.Sprintf("cannot claim ip adrress for cr: %s, ep: %s", cr.GetName(), addressClaimCxt.AddressClaimName)
+				return nil, errors.Wrap(err, msg)
+			}
+			prefixClaims.AddPrefix(iputil.IsIPv6(pi.IsIpv6()), addressPrefix)
+		}
+	}
+	return prefixClaims, nil
+}
+
+func (r *network) AddBridgeInterface(ctx context.Context, cr *infrav1alpha1.Network, ifCtxt *ifceContext) error {
+	// allocate a vlanID if the attachment type is VLAN
+	vlanId, err := r.getVLANID(ctx, cr, ifCtxt)
+	if err != nil {
+		return err
+	}
+
+	d := r.getDevice(ifCtxt.nodeName)
+	d.AddBridgedInterface(ifCtxt.niName, ifCtxt.ifName, int(vlanId), ifCtxt.attachmentType)
 	return nil
 }
 
-func (r *network) PopulateIRBInterface(ctx context.Context, cr *infrav1alpha1.Network, routed bool, bdName, rtName string, ep invv1alpha1.Endpoint, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
-	nodeName := ep.Spec.NodeName
-	if _, ok := r.devices[nodeName]; !ok {
-		r.devices[nodeName] = new(ygotsrl.Device)
+func (r *network) AddIRBBridgeInterface(ctx context.Context, cr *infrav1alpha1.Network, ifCtxt *ifceContext) error {
+	index := r.hash.Insert(ifCtxt.bdName, "dummy", map[string]string{})
+	d := r.getDevice(ifCtxt.nodeName)
+	d.AddBridgedInterface(ifCtxt.bdName, device.IRBInterfaceName, int(index), reqv1alpha1.AttachmentTypeNone)
+	return nil
+}
+
+func (r *network) AddRoutedInterface(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
+	// allocate a vlanID if the attachment type is VLAN
+	vlanId, err := r.getVLANID(ctx, cr, ifctx)
+	if err != nil {
+		return err
 	}
-	// allocate IP = per bdName (label in ep)
-	// allocate Address based on the bdName
-	// how to know it is ipv4 or ipv6
-
-	niIndex := r.hash.Insert(bdName, "dummy", map[string]string{})
-	niItfceSubItfceName := strings.Join([]string{irbInterfaceName, strconv.Itoa(int(niIndex))}, ".")
-	i := r.devices[nodeName].GetOrCreateInterface(irbInterfaceName)
-	si := i.GetOrCreateSubinterface(niIndex)
-
-	if routed {
-		for _, prefix := range prefixes {
-			pi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
-
-			prefixKind := ipamv1alpha1.PrefixKindNetwork
-			if value, ok := prefix.Labels[allocv1alpha1.NephioPrefixKindKey]; ok {
-				prefixKind = ipamv1alpha1.GetPrefixKindFromString(value)
-			}
-			prefixLength := 24
-			if pi.IsIpv6() {
-				prefixLength = 64
-			}
-			if prefixKind == ipamv1alpha1.PrefixKindPool {
-				prefixLength = 16
-				if pi.IsIpv6() {
-					prefixLength = 48
-				}
-			}
-			af := pi.GetAddressFamily()
-
-			// add the prefix labels to the prefix selector labels
-			prefixSelectorLabels := map[string]string{
-				allocv1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromNetworkInstancePrefix(rtName, pi.String()),
-				allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
-			}
-
-			labels[allocv1alpha1.NephioPurposeKey] = "irb prefix"
-
-			if prefixKind == ipamv1alpha1.PrefixKindNetwork {
-				prefixName := fmt.Sprintf("%s-%s", bdName, strings.ReplaceAll(pi.String(), "/", "-"))
-				prefixName = strings.ReplaceAll(prefixName, ":", "-")
-				_, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
-					metav1.ObjectMeta{
-						Name:      prefixName,
-						Namespace: cr.Namespace,
-					},
-					ipamv1alpha1.IPAllocationSpec{
-						Kind:            prefixKind,
-						NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
-						AddressFamily:   &af,
-						PrefixLength:    util.PointerUint8(prefixLength),
-						CreatePrefix:    pointer.Bool(true),
-						AllocationLabels: allocv1alpha1.AllocationLabels{
-							UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-								Labels: labels,
-							},
-							Selector: &metav1.LabelSelector{
-								MatchLabels: prefixSelectorLabels,
-							},
-						},
-					},
-					ipamv1alpha1.IPAllocationStatus{},
-				), nil)
-				if err != nil {
-					msg := fmt.Sprintf("cannot claim ip prefix for irb: %s, link: %s", cr.GetName(), prefixName)
-					return errors.Wrap(err, msg)
-				}
-				// for network based prefixes i will allocate a gateway IP
-				if prefixKind == ipamv1alpha1.PrefixKindNetwork {
-					// add the selector labels to the labels to ensure we pick the right prefix
-					addressSelectorLabels := map[string]string{
-						allocv1alpha1.NephioNsnNameKey:      prefixName,
-						allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
-					}
-
-					prefixAlloc, err := r.IpamClientProxy.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
-						metav1.ObjectMeta{
-							Name:      fmt.Sprintf("%s-gateway", prefixName),
-							Namespace: cr.Namespace,
-						},
-						ipamv1alpha1.IPAllocationSpec{
-							Kind:            prefixKind,
-							NetworkInstance: corev1.ObjectReference{Name: rtName, Namespace: cr.Namespace},
-							AddressFamily:   &af,
-							AllocationLabels: allocv1alpha1.AllocationLabels{
-								UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-									Labels: map[string]string{
-										allocv1alpha1.NephioGatewayKey: "true",
-										allocv1alpha1.NephioPurposeKey: "irb address",
-									},
-								},
-								Selector: &metav1.LabelSelector{
-									MatchLabels: addressSelectorLabels,
-								},
-							},
-						},
-						ipamv1alpha1.IPAllocationStatus{},
-					), nil)
-					if err != nil {
-						msg := fmt.Sprintf("cannot claim ip adrress for cr: %s, ep: %s", cr.GetName(), fmt.Sprintf("%s-gateway", prefixName))
-						return errors.Wrap(err, msg)
-					}
-					if pi.IsIpv6() {
-						ipv6 := si.GetOrCreateIpv6()
-						ipv6.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_Address{
-							AnycastGw: ygot.Bool(true),
-							IpPrefix:  prefixAlloc.Status.Prefix,
-						})
-						ipv6.GetOrCreateNeighborDiscovery().LearnUnsolicited = ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv6_NeighborDiscovery_LearnUnsolicited_global
-						ipv6.NeighborDiscovery.GetOrCreateHostRoute().GetOrCreatePopulate(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_HostRoute_Populate_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
-						ipv6.NeighborDiscovery.GetOrCreateEvpn().GetOrCreateAdvertise(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
-					} else {
-						ipv4 := si.GetOrCreateIpv4()
-						ipv4.AppendAddress(&ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Address{
-							AnycastGw: ygot.Bool(true),
-							IpPrefix:  prefixAlloc.Status.Prefix,
-						})
-						ipv4.GetOrCreateArp().LearnUnsolicited = ygot.Bool(true)
-						ipv4.Arp.GetOrCreateHostRoute().GetOrCreatePopulate(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_HostRoute_Populate_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
-						ipv4.Arp.GetOrCreateEvpn().GetOrCreateAdvertise(ygotsrl.E_SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType(ygotsrl.SrlNokiaInterfaces_Interface_Subinterface_Ipv4_Arp_Evpn_Advertise_RouteType_dynamic))
-					}
-					si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
-				}
-			}
-
-		}
+	// we update the linkname and add the index to get a unique name per link
+	ifctx.linkName = fmt.Sprintf("%s-%d", ifctx.linkName, vlanId)
+	pfxs, err := r.getLinkPrefixes(ctx, cr, ifctx, prefixes, labels)
+	if err != nil {
+		return err
 	}
-	ni := r.devices[nodeName].GetOrCreateNetworkInstance(bdName)
-	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
-	if routed {
-		ni = r.devices[nodeName].GetOrCreateNetworkInstance(rtName)
-		ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
+	d := r.getDevice(ifctx.nodeName)
+	d.AddRoutedInterface(ifctx.niName, ifctx.ifName, int(vlanId), ifctx.attachmentType, pfxs)
+	return nil
+}
+
+func (r *network) AddIRBRoutedInterface(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
+	index := r.hash.Insert(ifctx.bdName, "dummy", map[string]string{})
+
+	pfxs, err := r.getLinkPrefixes(ctx, cr, ifctx, prefixes, labels)
+	if err != nil {
+		return err
 	}
-	ni.GetOrCreateInterface(niItfceSubItfceName)
+
+	d := r.getDevice(ifctx.nodeName)
+	d.AddRoutedInterface(ifctx.niName, device.IRBInterfaceName, int(index), reqv1alpha1.AttachmentTypeNone, pfxs)
+	return nil
+}
+
+func (r *network) AddLoopbackInterface(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext, prefixes []ipamv1alpha1.Prefix) error {
+	index := 0
+
+	pfxs, err := r.getLoopbackPrefixes(ctx, cr, ifctx, prefixes)
+	if err != nil {
+		return err
+	}
+	d := r.getDevice(ifctx.nodeName)
+	d.AddRoutedInterface(ifctx.niName, device.SystemInterfaceName, int(index), reqv1alpha1.AttachmentTypeNone, pfxs)
 	return nil
 }

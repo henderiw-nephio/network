@@ -25,9 +25,14 @@ import (
 	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	"github.com/henderiw-nephio/network/pkg/endpoints"
+	"github.com/henderiw-nephio/network/pkg/ipam"
+	"github.com/henderiw-nephio/network/pkg/nodes"
 	"github.com/henderiw-nephio/network/pkg/resources"
 	"github.com/henderiw-nephio/network/pkg/targets"
+	"github.com/henderiw-nephio/network/pkg/vlan"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
+	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
@@ -41,7 +46,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/srl-labs/ygotsrl/v22"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -112,15 +116,9 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 		Owns(&ipamv1alpha1.NetworkInstance{}).
 		Owns(&vlanv1alpha1.VLANDatabase{}).
 		Owns(&configv1alpha1.Network{}).
+		Watches(&invv1alpha1.Endpoint{}, &endpointEventHandler{client: mgr.GetClient()}).
+		Watches(&invv1alpha1.Endpoint{}, &nodeEventHandler{client: mgr.GetClient()}).
 		Complete(r)
-	//WatchesRawSource(&source.Kind{Type: &invv1alpha1.Endpoint{}}, &EnqueueRequestForAllEndpoints{
-	//	client: mgr.GetClient(),
-	//	ctx:    ctx,
-	//}).
-	//WatchesRawSource(&source.Kind{Type: &invv1alpha1.Node{}}, &EnqueueRequestForAllNodes{
-	//	client: mgr.GetClient(),
-	//	ctx:    ctx,
-	//}).
 
 }
 
@@ -190,7 +188,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		r.APIPatchingApplicator,
 		resources.Config{
 			CR:             cr,
-			MatchingLabels: getMatchingLabels(cr),
+			MatchingLabels: allocv1alpha1.GetOwnerLabelsFromCR(cr),
 			Owns: []schema.GroupVersionKind{
 				configv1alpha1.NetworkGroupVersionKind,
 			},
@@ -222,22 +220,13 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 }
 
-/*
-func getMatchingLabels(cr client.Object) client.MatchingLabels {
-	return map[string]string{
-		allocv1alpha1.NephioOwnerGvkKey:     meta.GVKToString(schema.GroupVersionKind{Group: configv1alpha1.GroupVersion.Group, Version: configv1alpha1.GroupVersion.Version, Kind: configv1alpha1.NetworkGroupKind}),
-		allocv1alpha1.NephioOwnerNsnNameKey: allocv1alpha1.GetGenericNamespacedName(types.NamespacedName{Namespace: cr.GetNamespace(), Name: cr.GetName()}),
-	}
-}
-*/
-
 func getMatchingNodeLabels(cr client.Object, nodeName string) client.MatchingLabels {
-	labels := getMatchingLabels(cr)
+	labels := allocv1alpha1.GetOwnerLabelsFromCR(cr)
 	labels[invv1alpha1.NephioNodeNameKey] = nodeName
 	return labels
 }
 
-func (r *reconciler) getProviderEndpoints(ctx context.Context, topology string) (*endpoints, error) {
+func (r *reconciler) getProviderEndpoints(ctx context.Context, topology string) (*endpoints.Endpoints, error) {
 	opts := []client.ListOption{
 		client.MatchingLabels{
 			invv1alpha1.NephioProviderKey: nokiaSRLProvider,
@@ -249,10 +238,10 @@ func (r *reconciler) getProviderEndpoints(ctx context.Context, topology string) 
 		r.l.Error(err, "cannot list endpoints")
 		return nil, err
 	}
-	return &endpoints{eps}, nil
+	return &endpoints.Endpoints{EndpointList: eps}, nil
 }
 
-func (r *reconciler) getProviderNodes(ctx context.Context, topology string) (*nodes, error) {
+func (r *reconciler) getProviderNodes(ctx context.Context, topology string) (*nodes.Nodes, error) {
 	opts := []client.ListOption{
 		client.MatchingLabels{
 			invv1alpha1.NephioProviderKey: nokiaSRLProvider,
@@ -264,10 +253,10 @@ func (r *reconciler) getProviderNodes(ctx context.Context, topology string) (*no
 		r.l.Error(err, "cannot list nodes")
 		return nil, err
 	}
-	return &nodes{nos}, nil
+	return &nodes.Nodes{NodeList: nos}, nil
 }
 
-func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints, nodes *nodes) error {
+func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints.Endpoints, nodes *nodes.Nodes) error {
 	n := &network{
 		APIPatchingApplicator: r.APIPatchingApplicator,
 		apply:                 true,
@@ -276,50 +265,50 @@ func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha
 		eps:                   eps,
 		nodes:                 nodes,
 		hash:                  hash.New(10000),
-		ipam:                  NewIPAM(r.IpamClientProxy),
-		vlan:                  NewVLAN(r.VlanClientProxy),
+		ipam:                  ipam.NewIPAM(r.IpamClientProxy),
+		vlan:                  vlan.NewVLAN(r.VlanClientProxy),
 	}
-	if err := n.PopulateBridgeDomains(ctx, cr); err != nil {
+	if err := n.AddBridgeDomains(ctx, cr); err != nil {
 		r.l.Error(err, "cannot populate bridgedomains")
 		return err
 	}
-	if err := n.PopulateRoutingTables(ctx, cr); err != nil {
+	if err := n.AddRoutingTables(ctx, cr); err != nil {
 		r.l.Error(err, "cannot populate routing Tables")
+		return err
+	}
+	if err := r.resources.APIApply(ctx); err != nil {
+		r.l.Error(err, "cannot apply resources to the API")
 		return err
 	}
 	return nil
 }
 
-func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints, nodes *nodes) error {
+func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints.Endpoints, nodes *nodes.Nodes) error {
 	n := &network{
 		devices:   map[string]*ygotsrl.Device{},
 		resources: r.resources,
 		eps:       eps,
 		nodes:     nodes,
 		hash:      hash.New(10000),
-		ipam:      NewIPAM(r.IpamClientProxy),
-		vlan:      NewVLAN(r.VlanClientProxy),
+		ipam:      ipam.NewIPAM(r.IpamClientProxy),
+		vlan:      vlan.NewVLAN(r.VlanClientProxy),
 	}
-	if err := n.PopulateBridgeDomains(ctx, cr); err != nil {
+	if err := n.AddBridgeDomains(ctx, cr); err != nil {
 		r.l.Error(err, "cannot populate bridgedomains")
 		return err
 	}
-	if err := n.PopulateRoutingTables(ctx, cr); err != nil {
+	if err := n.AddRoutingTables(ctx, cr); err != nil {
 		r.l.Error(err, "cannot populate routing Tables")
 		return err
 	}
-
-	for _, node := range nodes.Items {
-		r.l.Info("node", "node info", node)
-	}
-	if err := n.PopulateDefault(ctx, cr); err != nil {
-		r.l.Error(err, "cannot populate routing Tables")
+	if err := n.AddDefaultNodeConfig(ctx, cr); err != nil {
+		r.l.Error(err, "cannot populate default routing Tables")
 		return err
 	}
 
 	// list all networkConfigs
 	opts := []client.ListOption{
-		getMatchingLabels(cr),
+		allocv1alpha1.GetOwnerLabelsFromCR(cr),
 		client.InNamespace(cr.Namespace),
 	}
 	ncs := &configv1alpha1.NetworkList{}
@@ -362,10 +351,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			o.Status.LastAppliedConfig = existingNetwNodeConfig.Status.LastAppliedConfig
 		}
 
-		r.resources.AddNewResource(
-			corev1.ObjectReference{APIVersion: o.APIVersion, Kind: o.Kind, Name: o.Name, Namespace: o.Namespace},
-			o,
-		)
+		r.resources.AddNewResource(o)
 	}
 	return nil
 }

@@ -7,14 +7,14 @@ go 1.20
 //replace k8s.io/client-go => k8s.io/client-go v0.26.1
 
 //replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.14.6
-replace github.com/nephio-project/api => ../nephio-api
+//replace github.com/nephio-project/api => ../nephio-api
 
 require (
 	github.com/go-logr/logr v1.2.4
-	github.com/henderiw-nephio/nephio-controllers v0.0.0-20230531184916-8a259b549325
-	github.com/nephio-project/api v0.0.0-20230522173958-63a41669b495
+	github.com/henderiw-nephio/nephio-controllers v0.0.0-20230531190036-1399962d1854
+	github.com/nephio-project/api v0.0.0-20230531191407-cf0da6d1f7c7
 	github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230531154408-a4237c40cb76
-	github.com/nokia/k8s-ipam v0.0.4-0.20230531091740-a5fc07f8c2e2
+	github.com/nokia/k8s-ipam v0.0.4-0.20230601134504-cbd676793168
 	github.com/openconfig/gnmi v0.9.1
 	github.com/openconfig/gnmic v0.31.0
 	github.com/openconfig/goyang v1.4.0
@@ -24,6 +24,7 @@ require (
 	google.golang.org/protobuf v1.30.0
 	k8s.io/api v0.27.2
 	k8s.io/apimachinery v0.27.2
+	k8s.io/client-go v0.27.2
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 	sigs.k8s.io/controller-runtime v0.15.0
 )
@@ -194,7 +195,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	inet.af/netaddr v0.0.0-20230525184311-b8eac61e914a // indirect
 	k8s.io/apiextensions-apiserver v0.27.2 // indirect
-	k8s.io/client-go v0.27.2 // indirect
 	k8s.io/component-base v0.27.2 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230525220651-2546d827e515 // indirect

@@ -16,7 +16,6 @@ limitations under the License.
 
 package network
 
-/*
 import (
 	"context"
 
@@ -32,43 +31,42 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type EnqueueRequestForAllEndpoints struct {
+type endpointEventHandler struct {
 	client client.Client
 	l      logr.Logger
-	ctx    context.Context
 }
 
 // Create enqueues a request for all ip allocation within the ipam
-func (e *EnqueueRequestForAllEndpoints) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	e.add(evt.Object, q)
+func (e *endpointEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	e.add(ctx, evt.Object, q)
 }
 
 // Create enqueues a request for all ip allocation within the ipam
-func (e *EnqueueRequestForAllEndpoints) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	e.add(evt.ObjectOld, q)
-	e.add(evt.ObjectNew, q)
+func (e *endpointEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	e.add(ctx, evt.ObjectOld, q)
+	e.add(ctx, evt.ObjectNew, q)
 }
 
 // Create enqueues a request for all ip allocation within the ipam
-func (e *EnqueueRequestForAllEndpoints) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	e.add(evt.Object, q)
+func (e *endpointEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	e.add(ctx, evt.Object, q)
 }
 
 // Create enqueues a request for all ip allocation within the ipam
-func (e *EnqueueRequestForAllEndpoints) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
-	e.add(evt.Object, q)
+func (e *endpointEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+	e.add(ctx, evt.Object, q)
 }
 
-func (e *EnqueueRequestForAllEndpoints) add(obj runtime.Object, queue adder) {
+func (e *endpointEventHandler) add(ctx context.Context, obj runtime.Object, queue adder) {
 	cr, ok := obj.(*invv1alpha1.Endpoint)
 	if !ok {
 		return
 	}
-	e.l = log.FromContext(e.ctx)
+	e.l = log.FromContext(ctx)
 	e.l.Info("event", "kind", obj.GetObjectKind(), "name", cr.GetName())
 
 	networks := &infrav1alpha1.NetworkList{}
-	if err := e.client.List(e.ctx, networks); err != nil {
+	if err := e.client.List(ctx, networks); err != nil {
 		return
 	}
 
@@ -83,4 +81,3 @@ func (e *EnqueueRequestForAllEndpoints) add(obj runtime.Object, queue adder) {
 		}
 	}
 }
-*/
