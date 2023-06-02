@@ -28,10 +28,10 @@ import (
 // NetworkSpec defines the desired state of Network
 type NetworkSpec struct {
 	// Topology defines the topology to which this network applies
-	Topology      string         `json:"topology" yaml:"topology"`
-	// BridgeDomains define a set of logical ports that share the same 
-	// flooding or broadcast characteristics. Like a virtual LAN (VLAN), 
-	// a bridge domain spans one or more ports of multiple devices.  
+	Topology string `json:"topology" yaml:"topology"`
+	// BridgeDomains define a set of logical ports that share the same
+	// flooding or broadcast characteristics. Like a virtual LAN (VLAN),
+	// a bridge domain spans one or more ports of multiple devices.
 	BridgeDomains []BridgeDomain `json:"bridgeDomains,omitempty" yaml:"bridgeDomains,omitempty"`
 	// RoutingTables defines a set of routes belonging to a given routing instance
 	// Multiple routing tables are also called virtual routing instances. Each virtual
@@ -42,18 +42,18 @@ type NetworkSpec struct {
 
 type BridgeDomain struct {
 	// Name defines the name of the bridge domain
-	Name       string      `json:"name" yaml:"name"`
+	Name string `json:"name" yaml:"name"`
 	// Interfaces defines the interfaces belonging to the bridge domain
 	Interfaces []Interface `json:"interfaces,omitempty" yaml:"interfaces,omitempty"`
 }
 
 type RoutingTable struct {
 	// Name defines the name of the routing table
-	Name       string                `json:"name" yaml:"name"`
+	Name string `json:"name" yaml:"name"`
 	// Interfaces defines the interfaces belonging to the routing table
-	Interfaces []Interface           `json:"interfaces,omitempty" yaml:"interfaces,omitempty"`
+	Interfaces []Interface `json:"interfaces,omitempty" yaml:"interfaces,omitempty"`
 	// Prefixes defines the prefixes belonging to the routing table
-	Prefixes   []ipamv1alpha1.Prefix `json:"prefixes" yaml:"prefixes"`
+	Prefixes []ipamv1alpha1.Prefix `json:"prefixes" yaml:"prefixes"`
 }
 
 type Interface struct {
@@ -67,7 +67,7 @@ type Interface struct {
 	// InterfaceName defines the name of the interface
 	InterfaceName *string `json:"interfaceName,omitempty" yaml:"interfaceName,omitempty"`
 	// NodeName defines the name of the node the interface belongs to interface
-	NodeName      *string `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
+	NodeName *string `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
 	// Selector defines the selector criterias for the interface selection
 	Selector *metav1.LabelSelector `json:"selector,omitempty" yaml:"selector,omitempty"`
 	// AttachmentType defines the interface attachement: vlan or none

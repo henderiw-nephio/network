@@ -470,7 +470,7 @@ func TestNetworkRun(t *testing.T) {
 			Nodes:           multiNode,
 			Endpoints:       testEndpointsMultiNode,
 			CR:              testInternetCR,
-			ExpectedDevices: 2,
+			ExpectedDevices: 3,
 		},
 	}
 	for name, tc := range cases {

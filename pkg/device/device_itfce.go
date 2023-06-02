@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"strings"
 
-	
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/iputil"
 	"github.com/openconfig/ygot/ygot"
@@ -28,7 +27,6 @@ import (
 )
 
 const (
-
 	IRBInterfaceName    = "irb0"
 	SystemInterfaceName = "system0"
 )
@@ -124,7 +122,7 @@ func (d *Device) AddRoutedInterface(niName, ifName string, index int, attachment
 	ni := d.GetOrCreateNetworkInstance(niName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
 	if niName == "default" {
-		ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_default	
+		ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_default
 	}
 	ni.GetOrCreateInterface(getNiInterfaceName(ifName, index))
 }

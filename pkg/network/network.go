@@ -274,7 +274,7 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 func (r *network) AddDefaultNodeConfig(ctx context.Context, cr *infrav1alpha1.Network) error {
 	for _, rt := range cr.Spec.RoutingTables {
 		if rt.Name == defaultNetworkName {
-			fmt.Println("nodes: ",r.nodes.GetNodes())
+			fmt.Println("nodes: ", r.nodes.GetNodes())
 			for _, node := range r.nodes.GetNodes() {
 				if err := r.AddNodeConfig(ctx, cr, &ifceContext{
 					nodeName:      node.Name,
