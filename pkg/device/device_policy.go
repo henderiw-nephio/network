@@ -25,7 +25,7 @@ import (
 	"github.com/srl-labs/ygotsrl/v22"
 )
 
-func (d *Device) AddRoutingPolicy(prefixes []ipamv1alpha1.Prefix) error {
+func (d Device) AddRoutingPolicy(prefixes []ipamv1alpha1.Prefix) error {
 	// create a routing policy
 	rp := d.GetOrCreateRoutingPolicy().GetOrCreatePolicy("export-local")
 	rp.Name = ygot.String("export-local")

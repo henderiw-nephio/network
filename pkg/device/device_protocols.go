@@ -21,7 +21,7 @@ import (
 	"github.com/srl-labs/ygotsrl/v22"
 )
 
-func (d *Device) AddRoutingProtocols(niName string) {
+func (d Device) AddRoutingProtocols(niName string) {
 	ni := d.GetOrCreateNetworkInstance(niName)
 
 	bgp := ni.GetOrCreateProtocols().GetOrCreateBgp()

@@ -27,6 +27,7 @@ import (
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	"github.com/henderiw-nephio/network/pkg/ipam"
+	"github.com/henderiw-nephio/network/pkg/network"
 	"github.com/henderiw-nephio/network/pkg/nodes"
 	"github.com/henderiw-nephio/network/pkg/resources"
 	"github.com/henderiw-nephio/network/pkg/targets"
@@ -36,11 +37,8 @@ import (
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
-	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
-
-	//"github.com/nokia/k8s-ipam/pkg/resource"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
 	"github.com/openconfig/ygot/ygot"
 
@@ -257,23 +255,18 @@ func (r *reconciler) getProviderNodes(ctx context.Context, topology string) (*no
 }
 
 func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints.Endpoints, nodes *nodes.Nodes) error {
-	n := &network{
-		APIPatchingApplicator: r.APIPatchingApplicator,
-		apply:                 true,
-		devices:               map[string]*ygotsrl.Device{},
-		resources:             r.resources,
-		eps:                   eps,
-		nodes:                 nodes,
-		hash:                  hash.New(10000),
-		ipam:                  ipam.NewIPAM(r.IpamClientProxy),
-		vlan:                  vlan.NewVLAN(r.VlanClientProxy),
-	}
-	if err := n.AddBridgeDomains(ctx, cr); err != nil {
-		r.l.Error(err, "cannot populate bridgedomains")
-		return err
-	}
-	if err := n.AddRoutingTables(ctx, cr); err != nil {
-		r.l.Error(err, "cannot populate routing Tables")
+	n := network.New(&network.Config{
+		Config:    &infrav1alpha1.NetworkConfig{},
+		Apply:     true,
+		Resources: r.resources,
+		Endpoints: eps,
+		Nodes:     nodes,
+		Ipam:      ipam.NewIPAM(r.IpamClientProxy),
+		Vlan:      vlan.NewVLAN(r.VlanClientProxy),
+	})
+
+	if err := n.Run(ctx, cr); err != nil {
+		r.l.Error(err, "cannot execute network run")
 		return err
 	}
 	if err := r.resources.APIApply(ctx); err != nil {
@@ -284,25 +277,18 @@ func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha
 }
 
 func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints.Endpoints, nodes *nodes.Nodes) error {
-	n := &network{
-		devices:   map[string]*ygotsrl.Device{},
-		resources: r.resources,
-		eps:       eps,
-		nodes:     nodes,
-		hash:      hash.New(10000),
-		ipam:      ipam.NewIPAM(r.IpamClientProxy),
-		vlan:      vlan.NewVLAN(r.VlanClientProxy),
-	}
-	if err := n.AddBridgeDomains(ctx, cr); err != nil {
-		r.l.Error(err, "cannot populate bridgedomains")
-		return err
-	}
-	if err := n.AddRoutingTables(ctx, cr); err != nil {
-		r.l.Error(err, "cannot populate routing Tables")
-		return err
-	}
-	if err := n.AddDefaultNodeConfig(ctx, cr); err != nil {
-		r.l.Error(err, "cannot populate default routing Tables")
+	n := network.New(&network.Config{
+		Config:    &infrav1alpha1.NetworkConfig{},
+		Apply:     false,
+		Resources: r.resources,
+		Endpoints: eps,
+		Nodes:     nodes,
+		Ipam:      ipam.NewIPAM(r.IpamClientProxy),
+		Vlan:      vlan.NewVLAN(r.VlanClientProxy),
+	})
+
+	if err := n.Run(ctx, cr); err != nil {
+		r.l.Error(err, "cannot execute network run")
 		return err
 	}
 
@@ -320,7 +306,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 		networkConfigs[nc.Name] = nc
 	}
 
-	for nodeName, device := range n.devices {
+	for nodeName, device := range n.GetDevices() {
 		r.l.Info("node config", "nodeName", nodeName)
 
 		j, err := ygot.EmitJSON(device, &ygot.EmitJSONConfig{

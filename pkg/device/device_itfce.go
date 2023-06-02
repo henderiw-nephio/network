@@ -35,7 +35,9 @@ const (
 
 func getInterfaceName(ifName string) string {
 	ifName = strings.ReplaceAll(ifName, "-", "/")
-	ifName = strings.ReplaceAll(ifName, "e", "ethernet-")
+	if ifName[0] == 'e' {
+		ifName = strings.ReplaceAll(ifName, "e", "ethernet-")
+	}
 	return ifName
 }
 
@@ -45,7 +47,7 @@ func getNiInterfaceName(ifName string, index int) string {
 
 // AddBridgedInterface adds a bridge interface to the device config
 // index is the vlan ID or 0 for untagged bridge interfaces
-func (d *Device) AddBridgedInterface(niName, ifName string, index int, attachmentType reqv1alpha1.AttachmentType) {
+func (d Device) AddBridgedInterface(niName, ifName string, index int, attachmentType reqv1alpha1.AttachmentType) {
 	ifName = getInterfaceName(ifName)
 	i := d.GetOrCreateInterface(ifName)
 	si := i.GetOrCreateSubinterface(uint32(index))

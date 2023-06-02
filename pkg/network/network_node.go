@@ -27,7 +27,6 @@ import (
 
 func (r *network) AddNodeConfig(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext, prefixes []ipamv1alpha1.Prefix) error {
 	d := r.getDevice(ifctx.nodeName)
-
 	pfxs, err := r.getLoopbackPrefixes(ctx, cr, ifctx, prefixes)
 	if err != nil {
 		return err
@@ -35,10 +34,11 @@ func (r *network) AddNodeConfig(ctx context.Context, cr *infrav1alpha1.Network, 
 	// adds the system interface
 	d.AddRoutedInterface(ifctx.niName, device.SystemInterfaceName, 0, reqv1alpha1.AttachmentTypeNone, pfxs)
 
+	// add the routing policy
 	if err := d.AddRoutingPolicy(prefixes); err != nil {
 		return err
 	}
-
+	// add the underlay and overlay protocol for the default routing instance
 	d.AddRoutingProtocols(ifctx.niName)
 	return nil
 }

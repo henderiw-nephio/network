@@ -14,23 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package network
+package device
 
 import (
-	"context"
-
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"
 )
 
 // create a BridgeDomain (bdName + "-" + selectorName)
 // create BD Index (hash)
-func (r *network) AddBridgeDomain(ctx context.Context, nodeName, selectorName, bdName string) {
-	// get device context
-	d := r.getDevice(nodeName)
-
-	// create ni Intstance and interfaces
-	//bdIndex := r.hash.Insert(bdName, "dummy", map[string]string{})
+func (d Device) AddBridgeDomain(nodeName, selectorName, bdName string) {
+	// create ni Intstance
 	ni := d.GetOrCreateNetworkInstance(bdName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
 	ni.BridgeTable = &ygotsrl.SrlNokiaNetworkInstance_NetworkInstance_BridgeTable{
@@ -56,10 +50,7 @@ func (r *network) AddBridgeDomain(ctx context.Context, nodeName, selectorName, b
 	//return
 }
 
-func (r *network) AddRoutingInstance(ctx context.Context, nodeName, selectorName, rtName string) {
-	// get device context
-	d := r.getDevice(nodeName)
-
+func (d Device) AddRoutingInstance(nodeName, selectorName, rtName string) {
 	ni := d.GetOrCreateNetworkInstance(rtName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
 	if rtName == "default" {

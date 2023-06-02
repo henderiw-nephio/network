@@ -23,30 +23,30 @@ const (
 	InterfaceUsageKindExternal InterfaceUsageKind = "external"
 )
 
-func (r *NetworkConfigSpec) GetInterfacePrefixLength(interfaceKind InterfaceUsageKind, isIpv6 bool) uint8 {
+func (r *NetworkConfig) GetInterfacePrefixLength(interfaceKind InterfaceUsageKind, isIpv6 bool) uint8 {
 	switch interfaceKind {
 	case InterfaceUsageKindInternal:
 		if isIpv6 {
-			if r.PrefixLengths.IPv6.InterfaceInternal != nil {
-				return *r.PrefixLengths.IPv6.InterfaceInternal
+			if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv6 != nil && r.Spec.PrefixLengths.IPv6.InterfaceInternal != nil {
+				return *r.Spec.PrefixLengths.IPv6.InterfaceInternal
 			}
 			return 127
 		}
 		// has to be ipv4
-		if r.PrefixLengths.IPv4.InterfaceInternal != nil {
-			return *r.PrefixLengths.IPv4.InterfaceInternal
+		if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv4 != nil && r.Spec.PrefixLengths.IPv4.InterfaceInternal != nil {
+			return *r.Spec.PrefixLengths.IPv4.InterfaceInternal
 		}
 		return 31
 	case InterfaceUsageKindExternal:
 		if isIpv6 {
-			if r.PrefixLengths.IPv6.InterfaceExternal != nil {
-				return *r.PrefixLengths.IPv6.InterfaceExternal
+			if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv6 != nil && r.Spec.PrefixLengths.IPv6.InterfaceExternal != nil {
+				return *r.Spec.PrefixLengths.IPv6.InterfaceExternal
 			}
 			return 64
 		}
 		// has to be ipv4
-		if r.PrefixLengths.IPv4.InterfaceExternal != nil {
-			return *r.PrefixLengths.IPv4.InterfaceExternal
+		if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv4 != nil && r.Spec.PrefixLengths.IPv4.InterfaceExternal != nil {
+			return *r.Spec.PrefixLengths.IPv4.InterfaceExternal
 		}
 		return 24
 	default:

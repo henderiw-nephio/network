@@ -20,9 +20,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/nokia/k8s-ipam/pkg/meta"
-	//"github.com/nokia/k8s-ipam/pkg/resource"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
+	"github.com/nokia/k8s-ipam/pkg/meta"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +31,7 @@ type Resources interface {
 	AddNewResource(o client.Object)
 	GetExistingResources(ctx context.Context) error
 	APIApply(ctx context.Context) error
+	GetNewResources() map[corev1.ObjectReference]client.Object
 }
 
 type Config struct {
@@ -52,7 +52,7 @@ func New(c resource.APIPatchingApplicator, cfg Config) Resources {
 type resources struct {
 	resource.APIPatchingApplicator
 	cfg               Config
-	m                 sync.Mutex
+	m                 sync.RWMutex
 	newResources      map[corev1.ObjectReference]client.Object
 	existingResources map[corev1.ObjectReference]client.Object
 }
@@ -119,4 +119,11 @@ func (r *resources) APIApply(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (r *resources) GetNewResources() map[corev1.ObjectReference]client.Object {
+	r.m.RLock()
+	defer r.m.RUnlock()
+
+	return r.newResources
 }

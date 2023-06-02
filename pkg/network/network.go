@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/device"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
@@ -32,15 +33,44 @@ import (
 	"github.com/nokia/k8s-ipam/pkg/hash"
 	"github.com/pkg/errors"
 	"github.com/srl-labs/ygotsrl/v22"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	defaultNetworkName = "default"
 )
 
+type Network interface {
+	Run(ctx context.Context, cr *infrav1alpha1.Network) error
+	GetResources() resources.Resources
+	GetDevices() map[string]*ygotsrl.Device
+}
+
+type Config struct {
+	Config    *infrav1alpha1.NetworkConfig
+	Apply     bool
+	Resources resources.Resources
+	Endpoints *endpoints.Endpoints
+	Nodes     *nodes.Nodes
+	Ipam      ipam.IPAM
+	Vlan      vlan.VLAN
+}
+
+func New(cfg *Config) Network {
+	return &network{
+		config:    cfg.Config,
+		apply:     cfg.Apply,
+		devices:   map[string]*ygotsrl.Device{},
+		resources: cfg.Resources,
+		eps:       cfg.Endpoints,
+		nodes:     cfg.Nodes,
+		hash:      hash.New(10000),
+		ipam:      cfg.Ipam,
+		vlan:      cfg.Vlan,
+	}
+}
+
 type network struct {
-	config *infrav1alpha1.NetworkConfigSpec
+	config *infrav1alpha1.NetworkConfig
 	resource.APIPatchingApplicator
 	apply     bool
 	devices   map[string]*ygotsrl.Device
@@ -50,20 +80,32 @@ type network struct {
 	hash      hash.HashTable
 	ipam      ipam.IPAM
 	vlan      vlan.VLAN
+	l         logr.Logger
 }
 
-func (r *network) addIPAMNetworkInstance(cr *infrav1alpha1.Network, rt infrav1alpha1.RoutingTable) client.Object {
-	// create IPAM NetworkInstance
-	o := r.ipam.ClaimIPAMDB(cr, rt.Name, rt.Prefixes)
-	r.resources.AddNewResource(o)
-	return o
+func (r *network) Run(ctx context.Context, cr *infrav1alpha1.Network) error {
+	if err := r.AddBridgeDomains(ctx, cr); err != nil {
+		r.l.Error(err, "cannot populate bridgedomains")
+		return err
+	}
+	if err := r.AddRoutingTables(ctx, cr); err != nil {
+		r.l.Error(err, "cannot populate routing Tables")
+		return err
+	}
+	if !r.apply {
+		if err := r.AddDefaultNodeConfig(ctx, cr); err != nil {
+			r.l.Error(err, "cannot populate default routing Tables")
+			return err
+		}
+	}
+	return nil
 }
 
-func (r *network) addVlanDatabase(cr *infrav1alpha1.Network, dbIndexName string) client.Object {
-	// create VLAN DataBase
-	o := r.vlan.ClaimVLANDB(cr, dbIndexName)
-	r.resources.AddNewResource(o)
-	return o
+func (r *network) GetResources() resources.Resources {
+	return r.resources
+}
+func (r *network) GetDevices() map[string]*ygotsrl.Device {
+	return r.devices
 }
 
 func (r *network) AddBridgeDomains(ctx context.Context, cr *infrav1alpha1.Network) error {
@@ -144,7 +186,9 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 								return errors.Wrap(err, msg)
 							}
 							for selectorName, eps := range selectedEndpoints {
+								fmt.Println("selectorName: ", selectorName)
 								for _, ep := range eps {
+									fmt.Println("ep: ", ep.Name)
 									if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
 										rtName := rt.Name
 										// selectorName is a global unique identity (interface/node or a grouping like clusters)
@@ -161,13 +205,15 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 											niName:         rtName,
 											attachmentType: itfce.AttachmentType,
 										}
-										if err := r.AddIRBBridgeInterface(ctx, cr, ifctx); err != nil {
+										if err := r.AddBridgeIRBInterface(ctx, cr, ifctx); err != nil {
 											msg := fmt.Sprintf("cannot add irb bridged interface in rt: %s", rt.Name)
+											fmt.Println(msg)
 											return errors.Wrap(err, msg)
 										}
 										// populate the routed part
-										if err := r.AddIRBRoutedInterface(ctx, cr, ifctx, rt.Prefixes, map[string]string{}); err != nil {
+										if err := r.AddRoutedIRBInterface(ctx, cr, ifctx, rt.Prefixes, map[string]string{}); err != nil {
 											msg := fmt.Sprintf("cannot add irb routed interface in rt: %s", rt.Name)
+											fmt.Println(msg)
 											return errors.Wrap(err, msg)
 										}
 									}
@@ -228,6 +274,7 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 func (r *network) AddDefaultNodeConfig(ctx context.Context, cr *infrav1alpha1.Network) error {
 	for _, rt := range cr.Spec.RoutingTables {
 		if rt.Name == defaultNetworkName {
+			fmt.Println("nodes: ",r.nodes.GetNodes())
 			for _, node := range r.nodes.GetNodes() {
 				if err := r.AddNodeConfig(ctx, cr, &ifceContext{
 					nodeName:      node.Name,

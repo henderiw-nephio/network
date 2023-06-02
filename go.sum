@@ -751,8 +751,8 @@ github.com/nephio-project/api v0.0.0-20230531191407-cf0da6d1f7c7/go.mod h1:9YrjM
 github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230531154408-a4237c40cb76 h1:7fNlv7HBcLj+jvU7/lEfcbZTgdcf9C4A2ZwR+/VwX7s=
 github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230531154408-a4237c40cb76/go.mod h1:hxbBTwaPDdSug1BsTi4RJRNbou/27wfrBcseKp0YIj8=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
-github.com/nokia/k8s-ipam v0.0.4-0.20230601134504-cbd676793168 h1:0phdR1m7pHhxmz0thnCHJdpvSCeKhGC+JHpyZyICqts=
-github.com/nokia/k8s-ipam v0.0.4-0.20230601134504-cbd676793168/go.mod h1:puHYNVuWM77mFqVgwJkq2NePTVScWDlZZPB45sCN21g=
+github.com/nokia/k8s-ipam v0.0.4-0.20230602042608-ec096ab74332 h1:Q5v4tZWexfLoDOWmVKSxeExpFT39nJROT7z0JR9sBug=
+github.com/nokia/k8s-ipam v0.0.4-0.20230602042608-ec096ab74332/go.mod h1:puHYNVuWM77mFqVgwJkq2NePTVScWDlZZPB45sCN21g=
 github.com/oklog/run v1.0.0/go.mod h1:dlhp/R75TPv97u0XWUtDeV/lRKWPKSdTuV0TZvrmrQA=
 github.com/oklog/run v1.1.0 h1:GEenZ1cK0+q0+wsJew9qUg/DyD8k3JzYsZAi5gYi2mA=
 github.com/oklog/run v1.1.0/go.mod h1:sVPdnTZT1zYwAJeCMu2Th4T21pA3FPOQRfWjQlk7DVU=
@@ -968,6 +968,8 @@ golang.org/x/exp v0.0.0-20191227195350-da58074b4299/go.mod h1:2RIsYlXP63K8oxa1u0
 golang.org/x/exp v0.0.0-20200119233911-0405dc783f0a/go.mod h1:2RIsYlXP63K8oxa1u096TMicItID8zy7Y6sNkU49FU4=
 golang.org/x/exp v0.0.0-20200207192155-f17229e696bd/go.mod h1:J/WKrq2StrnmMY6+EHIKF9dgMWnmCNThgcyBT1FY9mM=
 golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6/go.mod h1:3jZMyOhIsHpP37uCMkUooju7aAi5cS1Q23tOzKc+0MU=
+golang.org/x/exp v0.0.0-20230321023759-10a507213a29 h1:ooxPy7fPvB4kwsA2h+iBNHkAbp/4JxTSwCmvdjEYmug=
+golang.org/x/exp v0.0.0-20230321023759-10a507213a29/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
 golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
 golang.org/x/image v0.0.0-20190802002840-cff245a6509b/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
