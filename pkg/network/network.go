@@ -211,7 +211,9 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 											return errors.Wrap(err, msg)
 										}
 										// populate the routed part
-										if err := r.AddRoutedIRBInterface(ctx, cr, ifctx, rt.Prefixes, map[string]string{}); err != nil {
+										// We add the actual labels of the selected endpoint based on the selector keys from the interface
+										if err := r.AddRoutedIRBInterface(ctx, cr, ifctx, rt.Prefixes,
+											endpoints.GetSelectorLabels(ep.Labels, endpoints.GetKeys(itfce.Selector))); err != nil {
 											msg := fmt.Sprintf("cannot add irb routed interface in rt: %s", rt.Name)
 											fmt.Println(msg)
 											return errors.Wrap(err, msg)
@@ -259,7 +261,7 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 							vlanDBIndex:    selectorName,
 							niName:         rtName,
 							attachmentType: itfce.AttachmentType,
-						}, rt.Prefixes, map[string]string{}); err != nil {
+						}, rt.Prefixes, endpoints.GetSelectorLabels(ep.Labels, endpoints.GetKeys(itfce.Selector))); err != nil {
 							msg := fmt.Sprintf("cannot add routed interface in rt: %s", rt.Name)
 							return errors.Wrap(err, msg)
 						}

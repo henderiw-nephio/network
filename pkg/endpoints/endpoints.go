@@ -29,6 +29,16 @@ type Endpoints struct {
 	*invv1alpha1.EndpointList
 }
 
+func GetSelectorLabels(labels map[string]string, keys []string) map[string]string {
+	selectorLabels := map[string]string{}
+	for _, key := range keys {
+		if v, ok := labels[key]; ok {
+			selectorLabels[key] = v
+		}
+	}
+	return selectorLabels
+}
+
 func GetKeys(s *metav1.LabelSelector) []string {
 	keys := []string{}
 	for k := range s.MatchLabels {
