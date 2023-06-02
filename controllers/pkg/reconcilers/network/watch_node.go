@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"

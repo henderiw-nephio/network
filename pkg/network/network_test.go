@@ -25,7 +25,7 @@ import (
 
 	"github.com/hansthienpondt/nipam/pkg/table"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	ipamcl "github.com/henderiw-nephio/network/pkg/ipam"
 	"github.com/henderiw-nephio/network/pkg/nodes"

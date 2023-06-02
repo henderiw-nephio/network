@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/device"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	"github.com/henderiw-nephio/network/pkg/ipam"

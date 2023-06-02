@@ -24,7 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	"github.com/henderiw-nephio/network/pkg/ipam"
 	"github.com/henderiw-nephio/network/pkg/network"

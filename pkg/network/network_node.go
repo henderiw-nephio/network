@@ -19,7 +19,7 @@ package network
 import (
 	"context"
 
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra/v1alpha1"
+	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/device"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
