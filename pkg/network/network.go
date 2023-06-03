@@ -84,9 +84,11 @@ type network struct {
 }
 
 func (r *network) Run(ctx context.Context, cr *infrav1alpha1.Network) error {
-	if err := r.AddBridgeDomains(ctx, cr); err != nil {
-		r.l.Error(err, "cannot populate bridgedomains")
-		return err
+	if !r.apply {
+		if err := r.AddBridgeDomains(ctx, cr); err != nil {
+			r.l.Error(err, "cannot populate bridgedomains")
+			return err
+		}
 	}
 	if err := r.AddRoutingTables(ctx, cr); err != nil {
 		r.l.Error(err, "cannot populate routing Tables")
@@ -109,6 +111,7 @@ func (r *network) GetDevices() map[string]*ygotsrl.Device {
 }
 
 func (r *network) AddBridgeDomains(ctx context.Context, cr *infrav1alpha1.Network) error {
+
 	for _, bd := range cr.Spec.BridgeDomains {
 		// tracker tracks if we already initialized the context
 		// it ensure we dont duplicate allocations, etc etc
@@ -129,14 +132,16 @@ func (r *network) AddBridgeDomains(ctx context.Context, cr *infrav1alpha1.Networ
 						bdName := itfce.GetBridgeDomainName(bd.Name, selectorName)
 
 						// create a VLANDatabase (based on selectorName)
-						if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
-							r.addVlanDatabase(cr, selectorName)
-						}
-						// we dont proceed if we need to apply the databases first, since they are used
-						// as an index to allocate resources from
-						if r.apply {
-							continue
-						}
+						/*
+							if itfce.AttachmentType == reqv1alpha1.AttachmentTypeVLAN {
+								r.addVlanDatabase(cr, selectorName)
+							}
+							// we dont proceed if we need to apply the databases first, since they are used
+							// as an index to allocate resources from
+							if r.apply {
+								continue
+							}
+						*/
 
 						// create bridgedomain (bdname) + create a bd index
 						r.AddBridgeDomain(ctx, ep.Spec.NodeName, selectorName, bdName)

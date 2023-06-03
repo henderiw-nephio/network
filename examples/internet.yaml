@@ -1,24 +1,25 @@
 apiVersion: infra.nephio.org/v1alpha1
 kind: Network
 metadata:
-  name: internet
+  name: vpc-internet
 spec:
   topology: nephio
   routingTables:
-  - name: internet
+  - name: vpc-internet
     prefixes:
+    - prefix: 0172::/32
     - prefix: 172.0.0.0/16
+    - prefix: 1000::/32
       labels:
-        nephio.org/purpose: multus-interfaces
+        nephio.org/prefix-kind: pool
     - prefix: 10.0.0.0/8
       labels:
         nephio.org/prefix-kind: pool
-        nephio.org/purpose: pool
     interfaces:
     - kind: bridgedomain
-      bridgeDomainName: internet 
+      bridgeDomainName: vpc-internet 
   bridgeDomains: 
-  - name: internet
+  - name: vpc-internet
     interfaces:
     - selector:
         matchExpressions:
