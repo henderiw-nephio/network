@@ -25,6 +25,7 @@ import (
 	"github.com/nokia/k8s-ipam/pkg/utils/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -48,10 +49,21 @@ type ipam struct {
 func (r *ipam) ClaimIPAMDB(cr client.Object, dbIndexName string, prefixes []ipamv1alpha1.Prefix) *ipamv1alpha1.NetworkInstance {
 	return ipamv1alpha1.BuildNetworkInstance(
 		metav1.ObjectMeta{
-			Name:            dbIndexName,
-			Namespace:       cr.GetNamespace(),
-			Labels:          allocv1alpha1.GetOwnerLabelsFromCR(cr),
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.GetResourceVersion(), Kind: cr.GetObjectKind().GroupVersionKind().Kind, Name: cr.GetName(), UID: cr.GetUID(), Controller: pointer.Bool(true)}},
+			Name:      dbIndexName,
+			Namespace: cr.GetNamespace(),
+			Labels:    allocv1alpha1.GetOwnerLabelsFromCR(cr),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: schema.GroupVersion{
+						Group:   cr.GetObjectKind().GroupVersionKind().Group,
+						Version: cr.GetObjectKind().GroupVersionKind().Version,
+					}.String(),
+					Kind:       cr.GetObjectKind().GroupVersionKind().Kind,
+					Name:       cr.GetName(),
+					UID:        cr.GetUID(),
+					Controller: pointer.Bool(true),
+				},
+			},
 		}, ipamv1alpha1.NetworkInstanceSpec{
 			Prefixes: prefixes,
 		}, ipamv1alpha1.NetworkInstanceStatus{})

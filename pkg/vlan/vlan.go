@@ -24,6 +24,7 @@ import (
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -44,10 +45,22 @@ type vlan struct {
 func (r *vlan) ClaimVLANDB(cr client.Object, dbIndexName string) *vlanv1alpha1.VLANDatabase {
 	return vlanv1alpha1.BuildVLANDatabase(
 		metav1.ObjectMeta{
-			Name:            dbIndexName,
-			Namespace:       cr.GetNamespace(),
-			Labels:          allocv1alpha1.GetOwnerLabelsFromCR(cr),
-			OwnerReferences: []metav1.OwnerReference{{APIVersion: cr.GetResourceVersion(), Kind: cr.GetObjectKind().GroupVersionKind().Kind, Name: cr.GetName(), UID: cr.GetUID(), Controller: pointer.Bool(true)}},
+			Name:      dbIndexName,
+			Namespace: cr.GetNamespace(),
+			Labels:    allocv1alpha1.GetOwnerLabelsFromCR(cr),
+			OwnerReferences: []metav1.OwnerReference{
+				{
+
+					APIVersion: schema.GroupVersion{
+						Group:   cr.GetObjectKind().GroupVersionKind().Group,
+						Version: cr.GetObjectKind().GroupVersionKind().Version,
+					}.String(),
+					Kind:       cr.GetObjectKind().GroupVersionKind().Kind,
+					Name:       cr.GetName(),
+					UID:        cr.GetUID(),
+					Controller: pointer.Bool(true),
+				},
+			},
 		},
 		vlanv1alpha1.VLANDatabaseSpec{
 			Kind: vlanv1alpha1.VLANDBKindESG,
