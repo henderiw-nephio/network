@@ -400,20 +400,10 @@ var testInternetCR = &infrav1alpha1.Network{
 				Name: "internet",
 				Prefixes: []ipamv1alpha1.Prefix{
 					{
-						Prefix: "1000::/32",
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-							Labels: map[string]string{
-								allocv1alpha1.NephioPurposeKey: "multus-interfaces",
-							},
-						},
+						Prefix: "172::/32",
 					},
 					{
 						Prefix: "172.0.0.0/16",
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
-							Labels: map[string]string{
-								allocv1alpha1.NephioPurposeKey: "multus-interfaces",
-							},
-						},
 					},
 					{
 						Prefix: "10.0.0.0/8",
@@ -436,18 +426,64 @@ var testInternetCR = &infrav1alpha1.Network{
 	},
 }
 
+var vlanDBs = &vlanv1alpha1.VLANDatabaseList{
+	Items: []vlanv1alpha1.VLANDatabase{
+		{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: vlanv1alpha1.SchemeBuilder.GroupVersion.Identifier(),
+				Kind:       vlanv1alpha1.VLANDatabaseKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster01",
+				Namespace: "default",
+			},
+			Spec: vlanv1alpha1.VLANDatabaseSpec{
+				Kind: vlanv1alpha1.VLANDBKindESG,
+			},
+		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: vlanv1alpha1.SchemeBuilder.GroupVersion.Identifier(),
+				Kind:       vlanv1alpha1.VLANDatabaseKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster02",
+				Namespace: "default",
+			},
+			Spec: vlanv1alpha1.VLANDatabaseSpec{
+				Kind: vlanv1alpha1.VLANDBKindESG,
+			},
+		},
+		{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: vlanv1alpha1.SchemeBuilder.GroupVersion.Identifier(),
+				Kind:       vlanv1alpha1.VLANDatabaseKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster03",
+				Namespace: "default",
+			},
+			Spec: vlanv1alpha1.VLANDatabaseSpec{
+				Kind: vlanv1alpha1.VLANDBKindESG,
+			},
+		},
+	},
+}
+
 func TestNetworkRun(t *testing.T) {
 	cases := map[string]struct {
 		CR              *infrav1alpha1.Network
 		Config          *infrav1alpha1.NetworkConfig
 		Endpoints       *endpoints.Endpoints
 		Nodes           *nodes.Nodes
+		vlanDBs         *vlanv1alpha1.VLANDatabaseList
 		ExpectedDevices int
 	}{
 		"defaultSingleNode": {
 			Config:          &infrav1alpha1.NetworkConfig{},
 			Nodes:           singleNode,
 			Endpoints:       testEndpointsSingleNode,
+			vlanDBs:         vlanDBs,
 			CR:              testDefaultCR,
 			ExpectedDevices: 1,
 		},
@@ -455,6 +491,7 @@ func TestNetworkRun(t *testing.T) {
 			Config:          &infrav1alpha1.NetworkConfig{},
 			Nodes:           singleNode,
 			Endpoints:       testEndpointsSingleNode,
+			vlanDBs:         vlanDBs,
 			CR:              testInternetCR,
 			ExpectedDevices: 1,
 		},
@@ -462,6 +499,7 @@ func TestNetworkRun(t *testing.T) {
 			Config:          &infrav1alpha1.NetworkConfig{},
 			Nodes:           multiNode,
 			Endpoints:       testEndpointsMultiNode,
+			vlanDBs:         vlanDBs,
 			CR:              testDefaultCR,
 			ExpectedDevices: 3,
 		},
@@ -469,6 +507,7 @@ func TestNetworkRun(t *testing.T) {
 			Config:          &infrav1alpha1.NetworkConfig{},
 			Nodes:           multiNode,
 			Endpoints:       testEndpointsMultiNode,
+			vlanDBs:         vlanDBs,
 			CR:              testInternetCR,
 			ExpectedDevices: 3,
 		},
@@ -490,6 +529,12 @@ func TestNetworkRun(t *testing.T) {
 			bevlan, _ := vlanbe.New(nil)
 			vlancp := vlan.NewBackendMock(bevlan)
 
+			ctx := context.Background()
+
+			for _, vlandb := range tc.vlanDBs.Items {
+				vlancp.CreateIndex(ctx, &vlandb)
+			}
+
 			n := New(&Config{
 				Config:    tc.Config,
 				Apply:     true,
@@ -499,7 +544,7 @@ func TestNetworkRun(t *testing.T) {
 				Ipam:      ipamcl.NewIPAM(ipamcp),
 				Vlan:      vlancl.NewVLAN(vlancp),
 			})
-			ctx := context.Background()
+
 			if err := n.Run(ctx, tc.CR); err != nil {
 				assert.Error(t, err)
 			}
