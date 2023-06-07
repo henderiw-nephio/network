@@ -338,6 +338,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 		}
 
 		/*
+		TO BE ADDED BACK
 		r.resources.AddNewResource(o)
 		*/
 	}
