@@ -52,13 +52,13 @@ func (r *NetworkConfig) GetInterfacePrefixLength(interfaceKind InterfaceUsageKin
 		return 24
 	case InterfaceUsageKindPool:
 		if isIpv6 {
-			if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv6 != nil && r.Spec.PrefixLengths.IPv6.InterfaceExternal != nil {
+			if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv6 != nil && r.Spec.PrefixLengths.IPv6.Pool != nil {
 				return *r.Spec.PrefixLengths.IPv6.Pool
 			}
 			return 48
 		}
 		// has to be ipv4
-		if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv4 != nil && r.Spec.PrefixLengths.IPv4.InterfaceExternal != nil {
+		if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv4 != nil && r.Spec.PrefixLengths.IPv4.Pool != nil {
 			return *r.Spec.PrefixLengths.IPv4.Pool
 		}
 		return 16
