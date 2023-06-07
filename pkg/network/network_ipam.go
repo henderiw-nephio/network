@@ -41,7 +41,7 @@ func (r *network) getPoolPrefixes(ctx context.Context, cr *infrav1alpha1.Network
 	for _, prefix := range prefixes {
 		if prefix.GetPrefixKind() == ipamv1alpha1.PrefixKindPool {
 			pi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
-			prefixLength := r.config.GetInterfacePrefixLength(ifctx.interfaceKind, pi.IsIpv6())
+			prefixLength := r.config.GetInterfacePrefixLength(infrav1alpha1.InterfaceUsageKindPool, pi.IsIpv6())
 
 			prefixClaimCtx := &ipamv1alpha1.PrefixClaimContext{
 				PrefixClaimName: fmt.Sprintf("%s-%s", ipamv1alpha1.GetNameFromPrefix(pi.String(), ifctx.niName, "pool"), ifctx.selectorName),
