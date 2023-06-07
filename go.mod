@@ -13,16 +13,16 @@ require (
 	github.com/go-logr/logr v1.2.4
 	github.com/hansthienpondt/nipam v0.0.5
 	github.com/henderiw-nephio/nephio-controllers v0.0.0-20230531190036-1399962d1854
-	github.com/nephio-project/api v0.0.0-20230531191407-cf0da6d1f7c7
+	github.com/nephio-project/api v0.0.0-20230605215709-2e793ab3e7f2
 	github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230531154408-a4237c40cb76
-	github.com/nokia/k8s-ipam v0.0.4-0.20230602042608-ec096ab74332
+	github.com/nokia/k8s-ipam v0.0.4-0.20230607023452-aae415816512
 	github.com/openconfig/gnmi v0.9.1
 	github.com/openconfig/gnmic v0.31.0
 	github.com/openconfig/goyang v1.4.0
 	github.com/openconfig/ygot v0.28.3
 	github.com/pkg/errors v0.9.1
 	github.com/srl-labs/ygotsrl/v22 v22.11.1
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	google.golang.org/protobuf v1.30.0
 	k8s.io/api v0.27.2
 	k8s.io/apimachinery v0.27.2
