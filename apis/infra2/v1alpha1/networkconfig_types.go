@@ -43,6 +43,8 @@ type IPv4PrefixLengths struct {
 	InterfaceInternal *uint8 `json:"interfaceInternal,omitempty" yaml:"interfaceInternal,omitempty"`
 	// +kubebuilder:default:=24
 	InterfaceExternal *uint8 `json:"interfaceExternal,omitempty" yaml:"interfaceExternal,omitempty"`
+	// +kubebuilder:default:=16
+	Pool *uint8 `json:"pool,omitempty" yaml:"pool,omitempty"`
 }
 
 type IPv6PrefixLengths struct {
@@ -50,6 +52,8 @@ type IPv6PrefixLengths struct {
 	InterfaceInternal *uint8 `json:"interfaceInternal,omitempty" yaml:"interfaceInternal,omitempty"`
 	// +kubebuilder:default:=64
 	InterfaceExternal *uint8 `json:"interfaceExternal,omitempty" yaml:"interfaceExternal,omitempty"`
+	// +kubebuilder:default:=48
+	Pool *uint8 `json:"pool,omitempty" yaml:"pool,omitempty"`
 }
 
 // +kubebuilder:object:root=true

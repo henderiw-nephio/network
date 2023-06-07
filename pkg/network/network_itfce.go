@@ -47,6 +47,7 @@ type ifceContext struct {
 	bdName         string // only used in routed IRB - used to calculate the index matching the bdName
 	niName         string // generic name for network instance can be rt or bd
 	attachmentType reqv1alpha1.AttachmentType
+	selectorName   string // used for pool allocations
 }
 
 func (r *network) AddBridgeInterface(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext) error {
@@ -87,6 +88,12 @@ func (r *network) AddRoutedInterface(ctx context.Context, cr *infrav1alpha1.Netw
 
 func (r *network) AddRoutedIRBInterface(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
 	index := r.hash.Insert(ifctx.bdName, "dummy", map[string]string{})
+
+	// pools are now allocated per cluster to make static routes easier
+	_, err := r.getPoolPrefixes(ctx, cr, ifctx, prefixes, labels)
+	if err != nil {
+		return err
+	}
 
 	pfxs, err := r.getLinkPrefixes(ctx, cr, ifctx, prefixes, labels)
 	if err != nil {

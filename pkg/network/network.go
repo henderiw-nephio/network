@@ -209,6 +209,7 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 											bdName:         bdName,
 											niName:         rtName,
 											attachmentType: itfce.AttachmentType,
+											selectorName:   selectorName,
 										}
 										if err := r.AddBridgeIRBInterface(ctx, cr, ifctx); err != nil {
 											msg := fmt.Sprintf("cannot add irb bridged interface in rt: %s", rt.Name)

@@ -21,6 +21,7 @@ type InterfaceUsageKind string
 const (
 	InterfaceUsageKindInternal InterfaceUsageKind = "internal"
 	InterfaceUsageKindExternal InterfaceUsageKind = "external"
+	InterfaceUsageKindPool InterfaceUsageKind = "pool"
 )
 
 func (r *NetworkConfig) GetInterfacePrefixLength(interfaceKind InterfaceUsageKind, isIpv6 bool) uint8 {
@@ -49,6 +50,18 @@ func (r *NetworkConfig) GetInterfacePrefixLength(interfaceKind InterfaceUsageKin
 			return *r.Spec.PrefixLengths.IPv4.InterfaceExternal
 		}
 		return 24
+	case InterfaceUsageKindPool:
+		if isIpv6 {
+			if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv6 != nil && r.Spec.PrefixLengths.IPv6.InterfaceExternal != nil {
+				return *r.Spec.PrefixLengths.IPv6.Pool
+			}
+			return 48
+		}
+		// has to be ipv4
+		if r.Spec.PrefixLengths != nil && r.Spec.PrefixLengths.IPv4 != nil && r.Spec.PrefixLengths.IPv4.InterfaceExternal != nil {
+			return *r.Spec.PrefixLengths.IPv4.Pool
+		}
+		return 16
 	default:
 		// invalid value
 		return 0

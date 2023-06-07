@@ -414,6 +414,15 @@ var testInternetCR = &infrav1alpha1.Network{
 							},
 						},
 					},
+					{
+						Prefix: "1000::/32",
+						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+							Labels: map[string]string{
+								allocv1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindPool),
+								allocv1alpha1.NephioPurposeKey:    "pool",
+							},
+						},
+					},
 				},
 				Interfaces: []infrav1alpha1.Interface{
 					{
