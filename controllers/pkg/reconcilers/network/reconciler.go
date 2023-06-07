@@ -337,7 +337,9 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			o.Status.LastAppliedConfig = existingNetwNodeConfig.Status.LastAppliedConfig
 		}
 
+		/*
 		r.resources.AddNewResource(o)
+		*/
 	}
 	return nil
 }
