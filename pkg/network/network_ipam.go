@@ -22,8 +22,8 @@ import (
 	"net/netip"
 
 	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
-	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
+	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
+	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/ipam/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/iputil"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,8 +46,8 @@ func (r *network) getPoolPrefixes(ctx context.Context, cr *infrav1alpha1.Network
 			prefixClaimCtx := &ipamv1alpha1.PrefixClaimContext{
 				PrefixClaimName: fmt.Sprintf("%s-%s", ipamv1alpha1.GetNameFromPrefix(pi.String(), ifctx.niName, "pool"), ifctx.selectorName),
 				PrefixSelectorLabels: map[string]string{
-					allocv1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromPrefix(pi.String(), ifctx.niName, ipamv1alpha1.NetworkInstancePrefixAggregate),
-					allocv1alpha1.NephioNsnNamespaceKey: cr.Namespace,
+					resourcev1alpha1.NephioNsnNameKey:      ipamv1alpha1.GetNameFromPrefix(pi.String(), ifctx.niName, ipamv1alpha1.NetworkInstancePrefixAggregate),
+					resourcev1alpha1.NephioNsnNamespaceKey: cr.Namespace,
 				},
 				PrefixUserDefinedLabels: labels,
 			}

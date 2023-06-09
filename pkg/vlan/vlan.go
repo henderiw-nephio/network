@@ -19,8 +19,8 @@ package vlan
 import (
 	"context"
 
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
-	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
+	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
+	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/vlan/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,24 +30,24 @@ import (
 )
 
 type VLAN interface {
-	ClaimVLANDB(cr client.Object, dbIndexName string) *vlanv1alpha1.VLANDatabase
+	ClaimVLANDB(cr client.Object, dbIndexName string) *vlanv1alpha1.VLANIndex
 	ClaimVLANID(ctx context.Context, cr client.Object, dbIndexName, claimName string) (*uint16, error)
 }
 
-func NewVLAN(c clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]) VLAN {
+func NewVLAN(c clientproxy.Proxy[*vlanv1alpha1.VLANIndex, *vlanv1alpha1.VLANClaim]) VLAN {
 	return &vlan{c}
 }
 
 type vlan struct {
-	clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]
+	clientproxy.Proxy[*vlanv1alpha1.VLANIndex, *vlanv1alpha1.VLANClaim]
 }
 
-func (r *vlan) ClaimVLANDB(cr client.Object, dbIndexName string) *vlanv1alpha1.VLANDatabase {
-	return vlanv1alpha1.BuildVLANDatabase(
+func (r *vlan) ClaimVLANDB(cr client.Object, dbIndexName string) *vlanv1alpha1.VLANIndex {
+	return vlanv1alpha1.BuildVLANIndex(
 		metav1.ObjectMeta{
 			Name:      dbIndexName,
 			Namespace: cr.GetNamespace(),
-			Labels:    allocv1alpha1.GetOwnerLabelsFromCR(cr),
+			Labels:    resourcev1alpha1.GetOwnerLabelsFromCR(cr),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 
@@ -62,23 +62,21 @@ func (r *vlan) ClaimVLANDB(cr client.Object, dbIndexName string) *vlanv1alpha1.V
 				},
 			},
 		},
-		vlanv1alpha1.VLANDatabaseSpec{
-			Kind: vlanv1alpha1.VLANDBKindESG,
-		},
-		vlanv1alpha1.VLANDatabaseStatus{},
+		vlanv1alpha1.VLANIndexSpec{},
+		vlanv1alpha1.VLANIndexStatus{},
 	)
 }
 
 func (r *vlan) ClaimVLANID(ctx context.Context, cr client.Object, dbIndexName, claimName string) (*uint16, error) {
-	vlanAlloc, err := r.Allocate(ctx, vlanv1alpha1.BuildVLANAllocation(
+	vlanAlloc, err := r.Claim(ctx, vlanv1alpha1.BuildVLANClaim(
 		metav1.ObjectMeta{
 			Name:      claimName,
 			Namespace: cr.GetNamespace(),
 		},
-		vlanv1alpha1.VLANAllocationSpec{
-			VLANDatabase: corev1.ObjectReference{Name: dbIndexName, Namespace: cr.GetNamespace()},
+		vlanv1alpha1.VLANClaimSpec{
+			VLANIndex: corev1.ObjectReference{Name: dbIndexName, Namespace: cr.GetNamespace()},
 		},
-		vlanv1alpha1.VLANAllocationStatus{},
+		vlanv1alpha1.VLANClaimStatus{},
 	), nil)
 	if err != nil {
 		return nil, err

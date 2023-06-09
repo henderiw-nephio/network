@@ -26,8 +26,8 @@ import (
 	"github.com/henderiw-nephio/network/pkg/targets"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
+	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
 	"github.com/openconfig/gnmic/api"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -107,14 +107,14 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if tg := r.targets.Get(req.NamespacedName); tg != nil {
 			if err := tg.Close(); err != nil {
 				r.l.Error(err, "cannot close client")
-				cr.SetConditions(allocv1alpha1.Failed(err.Error()))
+				cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 				return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 			}
 
 		}
 		if err := r.finalizer.RemoveFinalizer(ctx, cr); err != nil {
 			r.l.Error(err, "cannot remove finalizer")
-			cr.SetConditions(allocv1alpha1.Failed(err.Error()))
+			cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 			return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 		}
 
@@ -123,23 +123,23 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	if err := r.finalizer.AddFinalizer(ctx, cr); err != nil {
 		r.l.Error(err, "cannot add finalizer")
-		cr.SetConditions(allocv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	secret := &corev1.Secret{}
 	if err := r.Get(ctx, types.NamespacedName{Namespace: cr.GetNamespace(), Name: cr.Spec.SecretName}, secret); err != nil {
 		if resource.IgnoreNotFound(err) != nil {
-			cr.SetConditions(allocv1alpha1.Failed(err.Error()))
+			cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 			return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 		}
 		// TBD How de we handle secret unaviabalility -> do we watch secrets?
-		cr.SetConditions(allocv1alpha1.Failed("cannot connect to target, secret not available"))
+		cr.SetConditions(resourcev1alpha1.Failed("cannot connect to target, secret not available"))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 
 	if cr.Spec.Address == nil {
-		cr.SetConditions(allocv1alpha1.Failed("cannot connect to target, address not available"))
+		cr.SetConditions(resourcev1alpha1.Failed("cannot connect to target, address not available"))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 	tg, err := api.NewTarget(
@@ -151,16 +151,16 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	)
 	if err != nil {
 		r.l.Error(err, "cannot create target")
-		cr.SetConditions(allocv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 	err = tg.CreateGNMIClient(ctx)
 	if err != nil {
 		r.l.Error(err, "cannot create client")
-		cr.SetConditions(allocv1alpha1.Failed(err.Error()))
+		cr.SetConditions(resourcev1alpha1.Failed(err.Error()))
 		return ctrl.Result{Requeue: true}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
 	r.targets.Set(req.NamespacedName, tg)
-	cr.SetConditions(allocv1alpha1.Ready())
+	cr.SetConditions(resourcev1alpha1.Ready())
 	return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 }

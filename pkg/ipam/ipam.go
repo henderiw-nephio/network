@@ -19,8 +19,8 @@ package ipam
 import (
 	"context"
 
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
-	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
+	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
+	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/ipam/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	"github.com/nokia/k8s-ipam/pkg/utils/util"
 	corev1 "k8s.io/api/core/v1"
@@ -36,12 +36,12 @@ type IPAM interface {
 	ClaimIPAddress(ctx context.Context, cr client.Object, dbIndexName, claimName string, prefixKind ipamv1alpha1.PrefixKind, udl, sel map[string]string) (*string, error)
 }
 
-func NewIPAM(c clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]) IPAM {
+func NewIPAM(c clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPClaim]) IPAM {
 	return &ipam{c}
 }
 
 type ipam struct {
-	clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
+	clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPClaim]
 }
 
 // claimIPAMDB return a KRM IPAM network instance as client.Object
@@ -51,7 +51,7 @@ func (r *ipam) ClaimIPAMDB(cr client.Object, dbIndexName string, prefixes []ipam
 		metav1.ObjectMeta{
 			Name:      dbIndexName,
 			Namespace: cr.GetNamespace(),
-			Labels:    allocv1alpha1.GetOwnerLabelsFromCR(cr),
+			Labels:    resourcev1alpha1.GetOwnerLabelsFromCR(cr),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: schema.GroupVersion{
@@ -70,19 +70,19 @@ func (r *ipam) ClaimIPAMDB(cr client.Object, dbIndexName string, prefixes []ipam
 }
 
 func (r *ipam) ClaimIPPrefix(ctx context.Context, cr client.Object, dbIndexName, claimName string, prefixKind ipamv1alpha1.PrefixKind, prefixLength uint8, udl, sel map[string]string) (*string, error) {
-	prefix, err := r.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
+	prefix, err := r.Claim(ctx, ipamv1alpha1.BuildIPClaim(
 		metav1.ObjectMeta{
 			Name:      claimName,
 			Namespace: cr.GetNamespace(),
 		},
-		ipamv1alpha1.IPAllocationSpec{
+		ipamv1alpha1.IPClaimSpec{
 			Kind:            prefixKind,
 			NetworkInstance: corev1.ObjectReference{Name: dbIndexName, Namespace: cr.GetNamespace()},
 			//AddressFamily:   &af, -> automatically calculated + we allocate based on nsn
 			PrefixLength: util.PointerUint8(int(prefixLength)),
 			CreatePrefix: pointer.Bool(true),
-			AllocationLabels: allocv1alpha1.AllocationLabels{
-				UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+			ClaimLabels: resourcev1alpha1.ClaimLabels{
+				UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
 					Labels: udl,
 				},
 				Selector: &metav1.LabelSelector{
@@ -90,7 +90,7 @@ func (r *ipam) ClaimIPPrefix(ctx context.Context, cr client.Object, dbIndexName,
 				},
 			},
 		},
-		ipamv1alpha1.IPAllocationStatus{},
+		ipamv1alpha1.IPClaimStatus{},
 	), nil)
 	if err != nil {
 		return nil, err
@@ -99,17 +99,17 @@ func (r *ipam) ClaimIPPrefix(ctx context.Context, cr client.Object, dbIndexName,
 }
 
 func (r *ipam) ClaimIPAddress(ctx context.Context, cr client.Object, dbIndexName, claimName string, prefixKind ipamv1alpha1.PrefixKind, udl, sel map[string]string) (*string, error) {
-	address, err := r.Allocate(ctx, ipamv1alpha1.BuildIPAllocation(
+	address, err := r.Claim(ctx, ipamv1alpha1.BuildIPClaim(
 		metav1.ObjectMeta{
 			Name:      claimName,
 			Namespace: cr.GetNamespace(),
 		},
-		ipamv1alpha1.IPAllocationSpec{
+		ipamv1alpha1.IPClaimSpec{
 			Kind:            prefixKind,
 			NetworkInstance: corev1.ObjectReference{Name: dbIndexName, Namespace: cr.GetNamespace()},
 			//AddressFamily:   &af,
-			AllocationLabels: allocv1alpha1.AllocationLabels{
-				UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+			ClaimLabels: resourcev1alpha1.ClaimLabels{
+				UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
 					Labels: udl,
 				},
 				Selector: &metav1.LabelSelector{
@@ -117,7 +117,7 @@ func (r *ipam) ClaimIPAddress(ctx context.Context, cr client.Object, dbIndexName
 				},
 			},
 		},
-		ipamv1alpha1.IPAllocationStatus{},
+		ipamv1alpha1.IPClaimStatus{},
 	), nil)
 	if err != nil {
 		return nil, err

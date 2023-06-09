@@ -35,10 +35,10 @@ import (
 	//reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
-	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
-	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
+	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
+	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/ipam/v1alpha1"
+	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/vlan/v1alpha1"
 	ipambe "github.com/nokia/k8s-ipam/pkg/backend/ipam"
 	vlanbe "github.com/nokia/k8s-ipam/pkg/backend/vlan"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy/ipam"
@@ -323,33 +323,33 @@ var testDefaultCR = &infrav1alpha1.Network{
 				Prefixes: []ipamv1alpha1.Prefix{
 					{
 						Prefix: "2000::/32",
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+						UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
 							Labels: map[string]string{
-								allocv1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindNetwork),
+								resourcev1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindNetwork),
 							},
 						},
 					},
 					{
 						Prefix: "10.0.0.0/16",
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+						UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
 							Labels: map[string]string{
-								allocv1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindNetwork),
+								resourcev1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindNetwork),
 							},
 						},
 					},
 					{
 						Prefix: "192.0.0.0/16",
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+						UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
 							Labels: map[string]string{
-								allocv1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindLoopback),
+								resourcev1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindLoopback),
 							},
 						},
 					},
 					{
 						Prefix: "1000::/64",
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+						UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
 							Labels: map[string]string{
-								allocv1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindLoopback),
+								resourcev1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindLoopback),
 							},
 						},
 					},
@@ -407,19 +407,19 @@ var testInternetCR = &infrav1alpha1.Network{
 					},
 					{
 						Prefix: "10.0.0.0/8",
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+						UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
 							Labels: map[string]string{
-								allocv1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindPool),
-								allocv1alpha1.NephioPurposeKey:    "pool",
+								resourcev1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindPool),
+								resourcev1alpha1.NephioPurposeKey:    "pool",
 							},
 						},
 					},
 					{
 						Prefix: "1000::/32",
-						UserDefinedLabels: allocv1alpha1.UserDefinedLabels{
+						UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
 							Labels: map[string]string{
-								allocv1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindPool),
-								allocv1alpha1.NephioPurposeKey:    "pool",
+								resourcev1alpha1.NephioPrefixKindKey: string(ipamv1alpha1.PrefixKindPool),
+								resourcev1alpha1.NephioPurposeKey:    "pool",
 							},
 						},
 					},
@@ -435,45 +435,40 @@ var testInternetCR = &infrav1alpha1.Network{
 	},
 }
 
-var vlanDBs = &vlanv1alpha1.VLANDatabaseList{
-	Items: []vlanv1alpha1.VLANDatabase{
+var vlanDBs = &vlanv1alpha1.VLANIndexList{
+	Items: []vlanv1alpha1.VLANIndex{
 		{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: vlanv1alpha1.SchemeBuilder.GroupVersion.Identifier(),
-				Kind:       vlanv1alpha1.VLANDatabaseKind,
+				Kind:       vlanv1alpha1.VLANIndexKind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster01",
 				Namespace: "default",
 			},
-			Spec: vlanv1alpha1.VLANDatabaseSpec{
-				Kind: vlanv1alpha1.VLANDBKindESG,
-			},
+			Spec: vlanv1alpha1.VLANIndexSpec{},
 		},
 		{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: vlanv1alpha1.SchemeBuilder.GroupVersion.Identifier(),
-				Kind:       vlanv1alpha1.VLANDatabaseKind,
+				Kind:       vlanv1alpha1.VLANIndexKind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster02",
 				Namespace: "default",
 			},
-			Spec: vlanv1alpha1.VLANDatabaseSpec{
-				Kind: vlanv1alpha1.VLANDBKindESG,
-			},
+			Spec: vlanv1alpha1.VLANIndexSpec{},
 		},
 		{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: vlanv1alpha1.SchemeBuilder.GroupVersion.Identifier(),
-				Kind:       vlanv1alpha1.VLANDatabaseKind,
+				Kind:       vlanv1alpha1.VLANIndexKind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster03",
 				Namespace: "default",
 			},
-			Spec: vlanv1alpha1.VLANDatabaseSpec{
-				Kind: vlanv1alpha1.VLANDBKindESG,
+			Spec: vlanv1alpha1.VLANIndexSpec{
 			},
 		},
 	},
@@ -485,7 +480,7 @@ func TestNetworkRun(t *testing.T) {
 		Config          *infrav1alpha1.NetworkConfig
 		Endpoints       *endpoints.Endpoints
 		Nodes           *nodes.Nodes
-		vlanDBs         *vlanv1alpha1.VLANDatabaseList
+		vlanDBs         *vlanv1alpha1.VLANIndexList
 		ExpectedDevices int
 	}{
 		"defaultSingleNode": {
@@ -527,7 +522,7 @@ func TestNetworkRun(t *testing.T) {
 				resource.NewAPIPatchingApplicator(resource.NewMockClient()),
 				resources.Config{
 					CR:             tc.CR,
-					MatchingLabels: allocv1alpha1.GetOwnerLabelsFromCR(tc.CR),
+					MatchingLabels: resourcev1alpha1.GetOwnerLabelsFromCR(tc.CR),
 					Owns: []schema.GroupVersionKind{
 						configv1alpha1.NetworkGroupVersionKind,
 					},
@@ -560,8 +555,8 @@ func TestNetworkRun(t *testing.T) {
 
 			// Allocate resource
 			for ref, o := range resources.GetNewResources() {
-				if ref.Kind == vlanv1alpha1.VLANDatabaseKind {
-					x, ok := o.(*vlanv1alpha1.VLANDatabase)
+				if ref.Kind == vlanv1alpha1.VLANIndexKind {
+					x, ok := o.(*vlanv1alpha1.VLANIndex)
 					if !ok {
 						t.Errorf("expecting vlan Database, got: %v", reflect.TypeOf(o).Name())
 					}
@@ -578,7 +573,7 @@ func TestNetworkRun(t *testing.T) {
 						assert.Error(t, err)
 					}
 					for _, prefix := range x.Spec.Prefixes {
-						if _, err := ipamcp.Allocate(ctx, x, prefix); err != nil {
+						if _, err := ipamcp.Claim(ctx, x, prefix); err != nil {
 							assert.Error(t, err)
 						}
 					}

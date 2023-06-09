@@ -2,20 +2,13 @@ module github.com/henderiw-nephio/network
 
 go 1.20
 
-//replace k8s.io/api => k8s.io/api v0.26.1
-
-//replace k8s.io/client-go => k8s.io/client-go v0.26.1
-
-//replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.14.6
-//replace github.com/nephio-project/api => ../nephio-api
-
 require (
 	github.com/go-logr/logr v1.2.4
 	github.com/hansthienpondt/nipam v0.0.5
-	github.com/henderiw-nephio/nephio-controllers v0.0.0-20230531190036-1399962d1854
-	github.com/nephio-project/api v0.0.0-20230605215709-2e793ab3e7f2
+	github.com/henderiw-nephio/nephio-controllers v0.0.0-20230608192809-2993c3a95317
+	github.com/nephio-project/api v0.0.0-20230608190129-69a082eebe55
 	github.com/nephio-project/nephio/controllers/pkg v0.0.0-20230531154408-a4237c40cb76
-	github.com/nokia/k8s-ipam v0.0.4-0.20230607023452-aae415816512
+	github.com/nokia/k8s-ipam v0.0.4-0.20230608184434-0c910788bac7
 	github.com/openconfig/gnmi v0.9.1
 	github.com/openconfig/gnmic v0.31.0
 	github.com/openconfig/goyang v1.4.0

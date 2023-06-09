@@ -19,7 +19,7 @@ package device
 import (
 	"net/netip"
 
-	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
+	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/ipam/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/iputil"
 	"github.com/openconfig/ygot/ygot"
 	"github.com/srl-labs/ygotsrl/v22"

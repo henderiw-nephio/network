@@ -34,9 +34,9 @@ import (
 	"github.com/henderiw-nephio/network/pkg/vlan"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
-	allocv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/common/v1alpha1"
-	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/ipam/v1alpha1"
-	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/alloc/vlan/v1alpha1"
+	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
+	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/ipam/v1alpha1"
+	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/vlan/v1alpha1"
 	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
@@ -68,12 +68,12 @@ const (
 
 //+kubebuilder:rbac:groups=infra.nephio.org,resources=networks,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=infra.nephio.org,resources=networks/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=ipam.alloc.nephio.org,resources=networkinstances,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=ipam.alloc.nephio.org,resources=networkinstances/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=ipam.alloc.nephio.org,resources=ipprefixes,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=ipam.alloc.nephio.org,resources=ipprefixes/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=config.alloc.nephio.org,resources=networks,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=config.alloc.nephio.org,resources=networks/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=ipam.resource.nephio.org,resources=networkinstances,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=ipam.resource.nephio.org,resources=networkinstances/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=ipam.resource.nephio.org,resources=ipprefixes,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=ipam.resource.nephio.org,resources=ipprefixes/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=config.resource.nephio.org,resources=networks,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=config.resource.nephio.org,resources=networks/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=inv.nephio.org,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=inv.nephio.org,resources=endpoints/status,verbs=get;update;patch
 
@@ -112,7 +112,7 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 		Named("NetworkController").
 		For(&infrav1alpha1.Network{}).
 		Owns(&ipamv1alpha1.NetworkInstance{}).
-		Owns(&vlanv1alpha1.VLANDatabase{}).
+		Owns(&vlanv1alpha1.VLANIndex{}).
 		Owns(&configv1alpha1.Network{}).
 		Watches(&invv1alpha1.Endpoint{}, &endpointEventHandler{client: mgr.GetClient()}).
 		Watches(&invv1alpha1.Endpoint{}, &nodeEventHandler{client: mgr.GetClient()}).
@@ -123,8 +123,8 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 type reconciler struct {
 	resource.APIPatchingApplicator
 	finalizer       *resource.APIFinalizer
-	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPAllocation]
-	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANDatabase, *vlanv1alpha1.VLANAllocation]
+	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPClaim]
+	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANIndex, *vlanv1alpha1.VLANClaim]
 
 	l         logr.Logger
 	devices   map[string]*ygotsrl.Device
@@ -186,7 +186,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		r.APIPatchingApplicator,
 		resources.Config{
 			CR:             cr,
-			MatchingLabels: allocv1alpha1.GetOwnerLabelsFromCR(cr),
+			MatchingLabels: resourcev1alpha1.GetOwnerLabelsFromCR(cr),
 			Owns: []schema.GroupVersionKind{
 				configv1alpha1.NetworkGroupVersionKind,
 			},
@@ -219,7 +219,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 }
 
 func getMatchingNodeLabels(cr client.Object, nodeName string) client.MatchingLabels {
-	labels := allocv1alpha1.GetOwnerLabelsFromCR(cr)
+	labels := resourcev1alpha1.GetOwnerLabelsFromCR(cr)
 	labels[invv1alpha1.NephioNodeNameKey] = nodeName
 	return labels
 }
@@ -294,7 +294,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 
 	// list all networkConfigs
 	opts := []client.ListOption{
-		allocv1alpha1.GetOwnerLabelsFromCR(cr),
+		resourcev1alpha1.GetOwnerLabelsFromCR(cr),
 		client.InNamespace(cr.Namespace),
 	}
 	ncs := &configv1alpha1.NetworkList{}
