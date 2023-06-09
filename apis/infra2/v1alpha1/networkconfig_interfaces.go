@@ -21,7 +21,7 @@ type InterfaceUsageKind string
 const (
 	InterfaceUsageKindInternal InterfaceUsageKind = "internal"
 	InterfaceUsageKindExternal InterfaceUsageKind = "external"
-	InterfaceUsageKindPool InterfaceUsageKind = "pool"
+	InterfaceUsageKindPool     InterfaceUsageKind = "pool"
 )
 
 func (r *NetworkConfig) GetInterfacePrefixLength(interfaceKind InterfaceUsageKind, isIpv6 bool) uint8 {

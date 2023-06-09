@@ -26,12 +26,12 @@ import (
 	"github.com/hansthienpondt/nipam/pkg/table"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
 	infra2v1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
-	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	ipamcl "github.com/henderiw-nephio/network/pkg/ipam"
 	"github.com/henderiw-nephio/network/pkg/nodes"
 	"github.com/henderiw-nephio/network/pkg/resources"
 	vlancl "github.com/henderiw-nephio/network/pkg/vlan"
+	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 
 	//reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
@@ -469,8 +469,7 @@ var vlanDBs = &vlanv1alpha1.VLANIndexList{
 				Name:      "cluster03",
 				Namespace: "default",
 			},
-			Spec: vlanv1alpha1.VLANIndexSpec{
-			},
+			Spec: vlanv1alpha1.VLANIndexSpec{},
 		},
 	},
 }

@@ -55,6 +55,9 @@ spec:
                       interfaceInternal:
                         default: 31
                         type: integer
+                      pool:
+                        default: 16
+                        type: integer
                     type: object
                   ipv6:
                     description: IPv6 defines the ipv6 prefixlengths
@@ -64,6 +67,9 @@ spec:
                         type: integer
                       interfaceInternal:
                         default: 127
+                        type: integer
+                      pool:
+                        default: 48
                         type: integer
                     type: object
                 type: object

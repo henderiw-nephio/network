@@ -25,7 +25,6 @@ import (
 	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
 	infra2v1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
-	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	"github.com/henderiw-nephio/network/pkg/ipam"
 	"github.com/henderiw-nephio/network/pkg/network"
@@ -33,12 +32,13 @@ import (
 	"github.com/henderiw-nephio/network/pkg/resources"
 	"github.com/henderiw-nephio/network/pkg/targets"
 	"github.com/henderiw-nephio/network/pkg/vlan"
+	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
 	"github.com/nephio-project/nephio/controllers/pkg/resource"
+	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/ipam/v1alpha1"
 	vlanv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/vlan/v1alpha1"
-	invv1alpha1 "github.com/nokia/k8s-ipam/apis/inv/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/meta"
 	"github.com/nokia/k8s-ipam/pkg/proxy/clientproxy"
 	"github.com/openconfig/ygot/ygot"
@@ -339,8 +339,8 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 		}
 
 		/*
-		TO BE ADDED BACK
-		r.resources.AddNewResource(o)
+			TO BE ADDED BACK
+			r.resources.AddNewResource(o)
 		*/
 	}
 	return nil
