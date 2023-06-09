@@ -130,8 +130,7 @@ func (r *network) AddBridgeDomains(ctx context.Context, cr *infrav1alpha1.Networ
 				for _, ep := range eps {
 					if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
 						// selectorName is a global unique identity (interface/node or a grouping like clusters)
-						localIf := &localIf{itfce}
-						bdName := localIf.GetBridgeDomainName(bd.Name, selectorName)
+						bdName := itfce.GetBridgeDomainName(bd.Name, selectorName)
 
 						// create a VLANDatabase (based on selectorName)
 						/*
@@ -199,8 +198,7 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 									if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
 										rtName := rt.Name
 										// selectorName is a global unique identity (interface/node or a grouping like clusters)
-										localIf := &localIf{itfce}
-										bdName := localIf.GetBridgeDomainName(bd.Name, selectorName)
+										bdName := itfce.GetBridgeDomainName(bd.Name, selectorName)
 										// populate the bridge part
 										ifctx := &ifceContext{
 											nodeName:       ep.Spec.NodeName,
@@ -300,16 +298,4 @@ func (r *network) AddDefaultNodeConfig(ctx context.Context, cr *infrav1alpha1.Ne
 		}
 	}
 	return nil
-}
-
-type localIf struct {
-	infrav1alpha1.Interface
-}
-
-func (r *localIf) GetBridgeDomainName(bdName, selectorName string) string {
-	// selectorName is a global unique identity (interface/node or a grouping like clusters)
-	if r.Selector != nil {
-		return fmt.Sprintf("%s-%s-bd", bdName, selectorName)
-	}
-	return fmt.Sprintf("%s-bd", bdName)
 }
