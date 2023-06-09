@@ -24,7 +24,8 @@ import (
 	"github.com/go-logr/logr"
 	ctrlrconfig "github.com/henderiw-nephio/nephio-controllers/controllers/pkg/reconcilers/config"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infra2v1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	"github.com/henderiw-nephio/network/pkg/ipam"
 	"github.com/henderiw-nephio/network/pkg/network"
@@ -256,7 +257,7 @@ func (r *reconciler) getProviderNodes(ctx context.Context, topology string) (*no
 
 func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints.Endpoints, nodes *nodes.Nodes) error {
 	n := network.New(&network.Config{
-		Config:    &infrav1alpha1.NetworkConfig{},
+		Config:    &infra2v1alpha1.NetworkConfig{},
 		Apply:     true,
 		Resources: r.resources,
 		Endpoints: eps,
@@ -278,7 +279,7 @@ func (r *reconciler) applyInitialresources(ctx context.Context, cr *infrav1alpha
 
 func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Network, eps *endpoints.Endpoints, nodes *nodes.Nodes) error {
 	n := network.New(&network.Config{
-		Config:    &infrav1alpha1.NetworkConfig{},
+		Config:    &infra2v1alpha1.NetworkConfig{},
 		Apply:     false,
 		Resources: r.resources,
 		Endpoints: eps,

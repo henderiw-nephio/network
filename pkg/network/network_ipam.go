@@ -21,7 +21,8 @@ import (
 	"fmt"
 	"net/netip"
 
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infra2v1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	resourcev1alpha1 "github.com/nokia/k8s-ipam/apis/resource/common/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/ipam/v1alpha1"
 	"github.com/nokia/k8s-ipam/pkg/iputil"
@@ -41,7 +42,7 @@ func (r *network) getPoolPrefixes(ctx context.Context, cr *infrav1alpha1.Network
 	for _, prefix := range prefixes {
 		if prefix.GetPrefixKind() == ipamv1alpha1.PrefixKindPool {
 			pi := iputil.NewPrefixInfo(netip.MustParsePrefix(prefix.Prefix))
-			prefixLength := r.config.GetInterfacePrefixLength(infrav1alpha1.InterfaceUsageKindPool, pi.IsIpv6())
+			prefixLength := r.config.GetInterfacePrefixLength(infra2v1alpha1.InterfaceUsageKindPool, pi.IsIpv6())
 
 			prefixClaimCtx := &ipamv1alpha1.PrefixClaimContext{
 				PrefixClaimName: fmt.Sprintf("%s-%s", ipamv1alpha1.GetNameFromPrefix(pi.String(), ifctx.niName, "pool"), ifctx.selectorName),

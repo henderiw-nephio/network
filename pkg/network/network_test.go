@@ -25,7 +25,8 @@ import (
 
 	"github.com/hansthienpondt/nipam/pkg/table"
 	configv1alpha1 "github.com/henderiw-nephio/network/apis/config/v1alpha1"
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infra2v1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	ipamcl "github.com/henderiw-nephio/network/pkg/ipam"
 	"github.com/henderiw-nephio/network/pkg/nodes"
@@ -477,14 +478,14 @@ var vlanDBs = &vlanv1alpha1.VLANIndexList{
 func TestNetworkRun(t *testing.T) {
 	cases := map[string]struct {
 		CR              *infrav1alpha1.Network
-		Config          *infrav1alpha1.NetworkConfig
+		Config          *infra2v1alpha1.NetworkConfig
 		Endpoints       *endpoints.Endpoints
 		Nodes           *nodes.Nodes
 		vlanDBs         *vlanv1alpha1.VLANIndexList
 		ExpectedDevices int
 	}{
 		"defaultSingleNode": {
-			Config:          &infrav1alpha1.NetworkConfig{},
+			Config:          &infra2v1alpha1.NetworkConfig{},
 			Nodes:           singleNode,
 			Endpoints:       testEndpointsSingleNode,
 			vlanDBs:         vlanDBs,
@@ -492,7 +493,7 @@ func TestNetworkRun(t *testing.T) {
 			ExpectedDevices: 1,
 		},
 		"InternetSingleNode": {
-			Config:          &infrav1alpha1.NetworkConfig{},
+			Config:          &infra2v1alpha1.NetworkConfig{},
 			Nodes:           singleNode,
 			Endpoints:       testEndpointsSingleNode,
 			vlanDBs:         vlanDBs,
@@ -500,7 +501,7 @@ func TestNetworkRun(t *testing.T) {
 			ExpectedDevices: 1,
 		},
 		"defaultMultiNode": {
-			Config:          &infrav1alpha1.NetworkConfig{},
+			Config:          &infra2v1alpha1.NetworkConfig{},
 			Nodes:           multiNode,
 			Endpoints:       testEndpointsMultiNode,
 			vlanDBs:         vlanDBs,
@@ -508,7 +509,7 @@ func TestNetworkRun(t *testing.T) {
 			ExpectedDevices: 3,
 		},
 		"InternetMultiNode": {
-			Config:          &infrav1alpha1.NetworkConfig{},
+			Config:          &infra2v1alpha1.NetworkConfig{},
 			Nodes:           multiNode,
 			Endpoints:       testEndpointsMultiNode,
 			vlanDBs:         vlanDBs,

@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"

@@ -21,7 +21,8 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infra2v1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/device"
 	"github.com/henderiw-nephio/network/pkg/endpoints"
 	"github.com/henderiw-nephio/network/pkg/ipam"
@@ -46,7 +47,7 @@ type Network interface {
 }
 
 type Config struct {
-	Config    *infrav1alpha1.NetworkConfig
+	Config    *infra2v1alpha1.NetworkConfig
 	Apply     bool
 	Resources resources.Resources
 	Endpoints *endpoints.Endpoints
@@ -70,7 +71,7 @@ func New(cfg *Config) Network {
 }
 
 type network struct {
-	config *infrav1alpha1.NetworkConfig
+	config *infra2v1alpha1.NetworkConfig
 	resource.APIPatchingApplicator
 	apply     bool
 	devices   map[string]*ygotsrl.Device
@@ -129,7 +130,8 @@ func (r *network) AddBridgeDomains(ctx context.Context, cr *infrav1alpha1.Networ
 				for _, ep := range eps {
 					if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
 						// selectorName is a global unique identity (interface/node or a grouping like clusters)
-						bdName := itfce.GetBridgeDomainName(bd.Name, selectorName)
+						localIf := &localIf{itfce}
+						bdName := localIf.GetBridgeDomainName(bd.Name, selectorName)
 
 						// create a VLANDatabase (based on selectorName)
 						/*
@@ -151,7 +153,7 @@ func (r *network) AddBridgeDomains(ctx context.Context, cr *infrav1alpha1.Networ
 							ifName:         ep.Spec.InterfaceName,
 							linkName:       ep.GetLinkName(),
 							interfaceType:  interfaceTypeRegular,
-							interfaceKind:  infrav1alpha1.InterfaceUsageKindExternal,
+							interfaceKind:  infra2v1alpha1.InterfaceUsageKindExternal,
 							vlanDBIndex:    selectorName,
 							niName:         bdName,
 							attachmentType: itfce.AttachmentType,
@@ -197,14 +199,15 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 									if !tr.IsAlreadyDone(ep.Spec.NodeName, selectorName) {
 										rtName := rt.Name
 										// selectorName is a global unique identity (interface/node or a grouping like clusters)
-										bdName := itfce.GetBridgeDomainName(bd.Name, selectorName)
+										localIf := &localIf{itfce}
+										bdName := localIf.GetBridgeDomainName(bd.Name, selectorName)
 										// populate the bridge part
 										ifctx := &ifceContext{
 											nodeName:       ep.Spec.NodeName,
 											ifName:         device.IRBInterfaceName,
 											linkName:       ep.GetLinkName(),
 											interfaceType:  interfaceTypeIRB,
-											interfaceKind:  infrav1alpha1.InterfaceUsageKindExternal,
+											interfaceKind:  infra2v1alpha1.InterfaceUsageKindExternal,
 											vlanDBIndex:    selectorName,
 											bdName:         bdName,
 											niName:         rtName,
@@ -263,7 +266,7 @@ func (r *network) AddRoutingTables(ctx context.Context, cr *infrav1alpha1.Networ
 							ifName:         ep.Spec.InterfaceName,
 							linkName:       ep.GetLinkName(),
 							interfaceType:  interfaceTypeRegular,
-							interfaceKind:  infrav1alpha1.InterfaceUsageKindExternal,
+							interfaceKind:  infra2v1alpha1.InterfaceUsageKindExternal,
 							vlanDBIndex:    selectorName,
 							niName:         rtName,
 							attachmentType: itfce.AttachmentType,
@@ -288,7 +291,7 @@ func (r *network) AddDefaultNodeConfig(ctx context.Context, cr *infrav1alpha1.Ne
 					nodeName:      node.Name,
 					ifName:        device.SystemInterfaceName,
 					interfaceType: interfaceTypeRegular,
-					interfaceKind: infrav1alpha1.InterfaceUsageKindInternal,
+					interfaceKind: infra2v1alpha1.InterfaceUsageKindInternal,
 					niName:        rt.Name,
 				}, rt.Prefixes); err != nil {
 					return errors.Wrap(err, "cannot populate node config")
@@ -297,4 +300,16 @@ func (r *network) AddDefaultNodeConfig(ctx context.Context, cr *infrav1alpha1.Ne
 		}
 	}
 	return nil
+}
+
+type localIf struct {
+	infrav1alpha1.Interface
+}
+
+func (r *localIf) GetBridgeDomainName(bdName, selectorName string) string {
+	// selectorName is a global unique identity (interface/node or a grouping like clusters)
+	if r.Selector != nil {
+		return fmt.Sprintf("%s-%s-bd", bdName, selectorName)
+	}
+	return fmt.Sprintf("%s-bd", bdName)
 }

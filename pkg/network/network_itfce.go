@@ -20,7 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	infrav1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infra2v1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
+	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	"github.com/henderiw-nephio/network/pkg/device"
 	reqv1alpha1 "github.com/nephio-project/api/nf_requirements/v1alpha1"
 	ipamv1alpha1 "github.com/nokia/k8s-ipam/apis/resource/ipam/v1alpha1"
@@ -41,7 +42,7 @@ type ifceContext struct {
 	nodeName       string
 	ifName         string
 	interfaceType  interfaceType // "irb or "regular"
-	interfaceKind  infrav1alpha1.InterfaceUsageKind
+	interfaceKind  infra2v1alpha1.InterfaceUsageKind
 	linkName       string // ep.GetLinkName(int(vlanId))
 	vlanDBIndex    string // name of node/itfce or selectorName (e.g. cluster)
 	bdName         string // only used in routed IRB - used to calculate the index matching the bdName
