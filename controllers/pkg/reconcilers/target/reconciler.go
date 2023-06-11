@@ -98,7 +98,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
-	if cr.Labels[invv1alpha1.NephioProviderKey] != nokiaSRLProvider {
+	if cr.Spec.Provider != nokiaSRLProvider {
 		// this is a target that is not acted upon by this contoller
 		return ctrl.Result{}, nil
 	}
@@ -142,6 +142,7 @@ func (r *reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		cr.SetConditions(resourcev1alpha1.Failed("cannot connect to target, address not available"))
 		return ctrl.Result{}, errors.Wrap(r.Status().Update(ctx, cr), errUpdateStatus)
 	}
+	r.l.Info("target data", "name",req.NamespacedName.String(), "address",  *cr.Spec.Address, "username", string(secret.Data["username"]), "password", string(secret.Data["password"]))
 	tg, err := api.NewTarget(
 		api.Name(req.NamespacedName.String()),
 		api.Address(*cr.Spec.Address),
