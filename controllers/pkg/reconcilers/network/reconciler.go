@@ -30,7 +30,8 @@ import (
 	"github.com/henderiw-nephio/network/pkg/network"
 	"github.com/henderiw-nephio/network/pkg/nodes"
 	"github.com/henderiw-nephio/network/pkg/resources"
-	"github.com/henderiw-nephio/network/pkg/targets"
+
+	//"github.com/henderiw-nephio/network/pkg/targets"
 	"github.com/henderiw-nephio/network/pkg/vlan"
 	infrav1alpha1 "github.com/nephio-project/api/infra/v1alpha1"
 	reconcilerinterface "github.com/nephio-project/nephio/controllers/pkg/reconcilers/reconciler-interface"
@@ -107,7 +108,7 @@ func (r *reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, c i
 	r.devices = map[string]*ygotsrl.Device{}
 	r.VlanClientProxy = cfg.VlanClientProxy
 	r.IpamClientProxy = cfg.IpamClientProxy
-	r.targets = cfg.Targets
+	//r.targets = cfg.Targets
 
 	return nil, ctrl.NewControllerManagedBy(mgr).
 		Named("NetworkController").
@@ -127,9 +128,9 @@ type reconciler struct {
 	IpamClientProxy clientproxy.Proxy[*ipamv1alpha1.NetworkInstance, *ipamv1alpha1.IPClaim]
 	VlanClientProxy clientproxy.Proxy[*vlanv1alpha1.VLANIndex, *vlanv1alpha1.VLANClaim]
 
-	l         logr.Logger
-	devices   map[string]*ygotsrl.Device
-	targets   targets.Target
+	l       logr.Logger
+	devices map[string]*ygotsrl.Device
+	//targets   targets.Target
 	resources resources.Resources // get initialized for every cr/recocile loop
 }
 
@@ -338,10 +339,7 @@ func (r *reconciler) getNewResources(ctx context.Context, cr *infrav1alpha1.Netw
 			o.Status.LastAppliedConfig = existingNetwNodeConfig.Status.LastAppliedConfig
 		}
 
-		/*
-			TO BE ADDED BACK
-			r.resources.AddNewResource(o)
-		*/
+		r.resources.AddNewResource(o)
 	}
 	return nil
 }
