@@ -60,6 +60,9 @@ func (d Device) AddBridgedInterface(niName, ifName string, index int, attachment
 			},
 		}
 	}
+	if ifName == IRBInterfaceName {
+		si.Type = ygotsrl.SrlNokiaInterfaces_SiType_UNSET
+	}
 	ni := d.GetOrCreateNetworkInstance(niName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_mac_vrf
 	ni.GetOrCreateInterface(getNiInterfaceName(ifName, index))
@@ -118,6 +121,10 @@ func (d *Device) AddRoutedInterface(niName, ifName string, index int, attachment
 				}
 			}
 		}
+	}
+	if ifName == IRBInterfaceName {
+		si.GetOrCreateAnycastGw().VirtualRouterId = ygot.Uint8(1)
+		si.Type = ygotsrl.SrlNokiaInterfaces_SiType_UNSET
 	}
 	ni := d.GetOrCreateNetworkInstance(niName)
 	ni.Type = ygotsrl.SrlNokiaNetworkInstance_NiType_ip_vrf
