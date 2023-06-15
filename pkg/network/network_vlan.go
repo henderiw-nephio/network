@@ -38,7 +38,7 @@ func (r *network) getVLANID(ctx context.Context, cr *infrav1alpha1.Network, ifCt
 	if ifCtxt.attachmentType == reqv1alpha1.AttachmentTypeVLAN {
 		vlanID, err := r.vlan.ClaimVLANID(ctx, cr, ifCtxt.vlanDBIndex, ifCtxt.niName)
 		if err != nil {
-			msg := fmt.Sprintf("cannot claim vlan for cr: %s, niName: %s", cr.GetName(), ifCtxt.niName)
+			msg := fmt.Sprintf("cannot claim vlan for cr: %s, dbIndex: %s, niName: %s", cr.GetName(), ifCtxt.vlanDBIndex, ifCtxt.niName)
 			return 0, errors.Wrap(err, msg)
 		}
 		vlanId = *vlanID
