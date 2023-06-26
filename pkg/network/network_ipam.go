@@ -82,7 +82,12 @@ func (r *network) getLinkPrefixes(ctx context.Context, cr *infrav1alpha1.Network
 			} else {
 				ifctx.bdName = ifctx.niName
 			}
-			prefixClaimCtx := prefix.GetPrefixClaimContext(ifctx.niName, ifctx.bdName, linkName, nodeName, cr.Namespace, labels)
+			newLabels := prefix.GetUserDefinedLabels()
+			for k, v := range labels {
+				newLabels[k] = v
+			}
+
+			prefixClaimCtx := prefix.GetPrefixClaimContext(ifctx.niName, ifctx.bdName, linkName, nodeName, cr.Namespace, newLabels, )
 
 			_, err := r.ipam.ClaimIPPrefix(ctx, cr, ifctx.niName, prefixClaimCtx.PrefixClaimName, ipamv1alpha1.PrefixKindNetwork, prefixLength, prefixClaimCtx.PrefixUserDefinedLabels, prefixClaimCtx.PrefixSelectorLabels)
 			if err != nil {
