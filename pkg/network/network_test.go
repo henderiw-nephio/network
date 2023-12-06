@@ -546,7 +546,6 @@ func TestNetworkRun(t *testing.T) {
 		vlanDBs         *vlanv1alpha1.VLANIndexList
 		ExpectedDevices int
 	}{
-		/*
 		"defaultSingleNode": {
 			Config:          &infra2v1alpha1.NetworkConfig{},
 			Nodes:           singleNode,
@@ -579,7 +578,6 @@ func TestNetworkRun(t *testing.T) {
 			CR:              testInternetCR,
 			ExpectedDevices: 3,
 		},
-		*/
 		"VPC": {
 			Config:          &infra2v1alpha1.NetworkConfig{},
 			Nodes:           singleNode,
