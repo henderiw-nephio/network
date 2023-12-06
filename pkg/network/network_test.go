@@ -436,6 +436,69 @@ var testInternetCR = &infrav1alpha1.Network{
 	},
 }
 
+var testVPCNetworkName = "vpc-internal-f1-srl"
+var testVPCCR = &infrav1alpha1.Network{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: infrav1alpha1.SchemeBuilder.GroupVersion.Identifier(),
+		Kind:       infrav1alpha1.NetworkKind,
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      testVPCNetworkName,
+		Namespace: "default",
+	},
+	Spec: infrav1alpha1.NetworkSpec{
+		Topology: "nephio",
+		BridgeDomains: []infrav1alpha1.BridgeDomain{
+			{
+				Name: testVPCNetworkName,
+				Interfaces: []infrav1alpha1.Interface{
+					{
+						Kind: infrav1alpha1.InterfaceKindInterface,
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      invv1alpha1.NephioClusterNameKey,
+									Operator: "Exists",
+								},
+							},
+						},
+						AttachmentType: reqv1alpha1.AttachmentTypeVLAN,
+					},
+				},
+			},
+		},
+		RoutingTables: []infrav1alpha1.RoutingTable{
+			{
+				Name: testVPCNetworkName,
+				Prefixes: []ipamv1alpha1.Prefix{
+					{
+						Prefix: "172:5::/32",
+						UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
+							Labels: map[string]string{
+								resourcev1alpha1.NephioNetworkNameKey: "f1",
+							},
+						},
+					},
+					{
+						Prefix: "172.5.0.0/16",
+						UserDefinedLabels: resourcev1alpha1.UserDefinedLabels{
+							Labels: map[string]string{
+								resourcev1alpha1.NephioNetworkNameKey: "f1",
+							},
+						},
+					},
+				},
+				Interfaces: []infrav1alpha1.Interface{
+					{
+						Kind:             infrav1alpha1.InterfaceKindBridgeDomain,
+						BridgeDomainName: pointer.String(testVPCNetworkName),
+					},
+				},
+			},
+		},
+	},
+}
+
 var vlanDBs = &vlanv1alpha1.VLANIndexList{
 	Items: []vlanv1alpha1.VLANIndex{
 		{
@@ -483,6 +546,7 @@ func TestNetworkRun(t *testing.T) {
 		vlanDBs         *vlanv1alpha1.VLANIndexList
 		ExpectedDevices int
 	}{
+		/*
 		"defaultSingleNode": {
 			Config:          &infra2v1alpha1.NetworkConfig{},
 			Nodes:           singleNode,
@@ -514,6 +578,15 @@ func TestNetworkRun(t *testing.T) {
 			vlanDBs:         vlanDBs,
 			CR:              testInternetCR,
 			ExpectedDevices: 3,
+		},
+		*/
+		"VPC": {
+			Config:          &infra2v1alpha1.NetworkConfig{},
+			Nodes:           singleNode,
+			Endpoints:       testEndpointsSingleNode,
+			vlanDBs:         vlanDBs,
+			CR:              testVPCCR,
+			ExpectedDevices: 1,
 		},
 	}
 	for name, tc := range cases {

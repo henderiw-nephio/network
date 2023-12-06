@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 
 	infra2v1alpha1 "github.com/henderiw-nephio/network/apis/infra2/v1alpha1"
@@ -64,7 +65,8 @@ func (r *network) AddBridgeInterface(ctx context.Context, cr *infrav1alpha1.Netw
 }
 
 func (r *network) AddBridgeIRBInterface(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext) error {
-	index := r.hash.Insert(ifctx.bdName, "dummy", map[string]string{})
+	hashedBdName := sha256.Sum256([]byte(ifctx.bdName))
+	index := r.hash.Insert(string(hashedBdName[:]), "dummy", map[string]string{})
 	d := r.getDevice(ifctx.nodeName)
 	d.AddBridgedInterface(ifctx.bdName, device.IRBInterfaceName, int(index), reqv1alpha1.AttachmentTypeNone)
 	return nil
@@ -88,7 +90,8 @@ func (r *network) AddRoutedInterface(ctx context.Context, cr *infrav1alpha1.Netw
 }
 
 func (r *network) AddRoutedIRBInterface(ctx context.Context, cr *infrav1alpha1.Network, ifctx *ifceContext, prefixes []ipamv1alpha1.Prefix, labels map[string]string) error {
-	index := r.hash.Insert(ifctx.bdName, "dummy", map[string]string{})
+	hashedBdName := sha256.Sum256([]byte(ifctx.bdName))
+	index := r.hash.Insert(string(hashedBdName[:]), "dummy", map[string]string{})
 
 	// pools are now allocated per cluster to make static routes easier
 	_, err := r.getPoolPrefixes(ctx, cr, ifctx, prefixes, labels)
